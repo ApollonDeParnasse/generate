@@ -1,0 +1,29 @@
+**/#*
+
+# Ignore all symlinks in all folders
+**/*~
+
+
+**/.cache
+**/eln-cache
+
+
+# Ignore archive files
+**/*_archive
+
+
+
+# remove org files from tracking
+**/*.org
+
+
+/.eldev
+
+!README.org
+
+yesn
+**/scratch.*
+
+# Added automatically by ‘eldev init’.
+/.eldev
+/Eldev-local
