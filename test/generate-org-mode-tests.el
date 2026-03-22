@@ -1,0 +1,97 @@
+;;; generate-org-mode-tests.el --- Tests for org-mode  -*- lexical-binding: t; -*-
+
+;; Author: Earl Chase
+;; Maintainer: Earl Chase
+;; Version: 0.0
+;; Keywords: testing
+;; Package-Requires: ((emacs "30") (org "9.7") (dash "2.20.0") (s "1.13.1") (compat "29"))
+;; Homepage: https://github.com/ApollonDeParnasse/generate
+
+;; This file is NOT part of GNU Emacs.
+
+;; This program is free software; you can redistribute it and/or modify
+;; it under the terms of the GNU General Public License as published by
+;; the Free Software Foundation; either version 3, or (at your option)
+;; any later version.
+
+;; This program is distributed in the hope that it will be useful,
+;; but WITHOUT ANY WARRANTY; without even the implied warranty of
+;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+;; GNU General Public License for more details.
+
+;; You should have received a copy of the GNU General Public License
+;; along with GNU Emacs; see the file COPYING.  If not, write to the
+;; Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
+;; Boston, MA 02110-1301, USA.
+
+;;; Commentary:
+
+;; 
+
+;;; Code:
+
+(require 'seq)
+(require 'map)
+(require 'org)
+(require 'org-element)
+(require 's)
+(require 'dash)
+(require 'generate)
+
+(defconst generate-TEST-SRC-BLOCK-LANGS
+  (list "elisp" "emacs-lisp" "org"))
+
+(generate-ert-deftest-n-times generate--org-table-without-hlines ()
+  (-let* (((test-row-count test-column-count) (generate--two-random-nat-numbers-in-range-10))
+	  ((test-val-generator test-cell-value) (generate-random-cl-constantly))
+	  ((actual-table actual-table-values) (generate--org-table-without-hlines test-val-generator test-row-count test-column-count)))
+    (should (s-starts-with-p "| " actual-table))
+    (should (s-ends-with-p " |" actual-table))
+    (should (length= (s-split "\n" actual-table) test-row-count))
+    (should (length= actual-table-values test-row-count))
+    (should (length= (generate-seq-take-random-value-from-seq actual-table-values) test-column-count))))
+
+(generate-ert-deftest-n-times generate--org-table-with-hlines ()
+  (-let* (((test-row-count test-column-count) (generate--two-random-nat-numbers-in-range-10))
+	  ((test-val-generator test-cell-value) (generate-random-cl-constantly))
+	  ((actual-table actual-table-values) (generate--org-table-with-hlines test-val-generator test-row-count test-column-count)))
+    (should (s-starts-with-p "| " actual-table))
+    (should (s-ends-with-p " |" actual-table))
+    (should (g--len-eq (generate-seq-take-random-value-from-seq (seq-filter (-partial #'generate--not-equal 'hline) actual-table-values)) test-column-count))))
+
+(generate-ert-deftest-n-times generate--org-table ()
+  (-let* (((test-row-count test-column-count) (generate--two-random-nat-numbers-in-range-10))
+	  ((test-val-generator test-cell-value) (generate-random-cl-constantly))
+	  ((actual-table actual-table-values) (generate--org-table test-val-generator test-row-count test-column-count)))
+    (should (s-starts-with-p "| " actual-table))
+    (should (s-ends-with-p " |" actual-table))
+    (should (g--len-eq (generate-seq-take-random-value-from-seq (seq-filter (-partial #'generate--not-equal 'hline) actual-table-values)) test-column-count))))
+
+(generate-ert-deftest-n-times generate-with-buffer-with-org-table-without-hlines ()
+  (-let* (((test-list &as test-row-count test-column-count) (generate--two-random-nat-numbers-in-range-10))
+	  ((test-row-number test-column-number) (seq-map (lambda (val) (generate-random-nat-number-in-range (list 1 val))) test-list))
+	  ((test-val-generator test-cell-value) (generate-random-cl-constantly))
+	  ((actual-cell-value actual-table) (generate-with-buffer-with-org-table-without-hlines (list test-val-generator test-row-count test-column-count)
+									      (list (org-table-get test-row-number test-column-number) (org-table-to-lisp)))))
+    (should (string-equal actual-cell-value test-cell-value))
+    (should-not (member 'hline actual-table))))
+
+(generate-ert-deftest-n-times generate-with-buffer-with-org-table-with-hlines ()
+  (-let* (((test-list &as test-row-count test-column-count) (generate--two-random-nat-numbers-in-range-10))
+	  ((test-row-number test-column-number) (seq-map (lambda (val) (generate-random-nat-number-in-range (list 1 val))) test-list))
+	  ((test-val-generator test-cell-value) (generate-random-cl-constantly))
+	  (actual-cell-value (generate-with-buffer-with-org-table-with-hlines (list test-val-generator test-row-count test-column-count)
+									      (org-table-get test-row-number test-column-number))))
+    (should (string-equal actual-cell-value test-cell-value))))
+
+(generate-ert-deftest-n-times generate-with-buffer-with-org-table ()
+  (-let* (((test-list &as test-row-count test-column-count) (generate--two-random-nat-numbers-in-range-10))
+	    ((test-row-number test-column-number) (seq-map (lambda (val) (generate-random-nat-number-in-range (list 1 val))) test-list))
+	    ((test-val-generator test-cell-value) (generate-random-cl-constantly))
+	    ((actual-cell-value actual-table) (generate-with-buffer-with-org-table (list test-val-generator test-row-count test-column-count)
+										   (list (org-table-get test-row-number test-column-number) (org-table-to-lisp)))))
+    (should (string-equal actual-cell-value test-cell-value))))
+
+;; Local Variables:
+;; read-symbol-shorthands: (("g-" . "generate-"))
+;; End:
