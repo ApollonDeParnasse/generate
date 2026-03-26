@@ -3,7 +3,7 @@ PKG = generate
 LOAD_PATH  += -L .
 LOAD_PATH  += -L ./test
 
-.PHONY: test-primitives test-runner test-org
+.PHONY: test-primitives test-runner test-org check
 
 test-primitives: ## Run primitives tests
 test-primitives: 
@@ -29,9 +29,13 @@ test-org:
 scratch: 
 	$(EMACS) --batch -L . \
 		 -L ./test \
-		 -l scratch.el \
+		 -l scratch.el
 
-
+check:
+	$(EMACS) --batch -L . \
+		 -L ./test \
+		 -l generate-check.el \
+		 --eval "(ert-run-tests-batch-and-exit)";
 
 
 

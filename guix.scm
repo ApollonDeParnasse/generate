@@ -13,7 +13,7 @@
 (define-public generate
   (package
     (name "generate")
-    (version "0.0")
+    (version "0.0.0")
     (source (local-file (getcwd) #:recursive? #t))
     (build-system emacs-build-system)  
     (inputs (list emacs-dash emacs-s emacs-compat))
