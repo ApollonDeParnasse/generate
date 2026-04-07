@@ -551,7 +551,7 @@ In other words, use an exclusive range: [MIN, MAX)"
 
 (defalias 'generate-random-negative-number (-partial #'generate-random-nat-number-in-range generate--NEGATIVENUMS) "Returns a random negative number.")
 
-(defalias 'generate-random-nat-number-in-range-1-to-5 (-partial #'generate-random-nat-number-in-range generate--FIVERANGE) "Returns a random number that is greater than or equal to 1 and less than 5.")
+(defalias 'generate--random-nat-number-in-range-1-to-5 (-partial #'generate-random-nat-number-in-range generate--FIVERANGE) "Returns a random number that is greater than or equal to 1 and less than 5.")
 
 (defalias 'generate--random-nat-number-in-range-10 (-partial #'generate-random-nat-number-in-range generate--TENRANGE) "Returns a random number that is greater than or equal to 1 and less than 10.")
 
@@ -1041,7 +1041,7 @@ Each generator will be called a random number of times."
 \(fn INTEGER INTEGER)"
   (generate-data :list-transformer list-transformer :item-transformer (-partial #'generate--non-zero-bounded-modular-addition range 0) :exact-length exact-length :min-length min-length :max-length max-length))
 
-(defalias 'generate--list-of-nat-numbers-in-range-5 (-partial #'generate-list-of-n-nat-numbers-in-range generate--FIVERANGE))
+(defalias 'generate--list-of-n-nat-numbers-in-range-5 (-partial #'generate-list-of-n-nat-numbers-in-range generate--FIVERANGE))
 
 (defalias 'generate--list-of-n-nat-numbers-in-range-10 (-partial #'generate-list-of-n-nat-numbers-in-range generate--TENRANGE))
 
@@ -1635,7 +1635,7 @@ Values are hexadecimals."
   (lambda ()
     (let* ((group-names (generate-random-list-of-strings))
 	   (total-test-count (length group-names))
-	   (test-counts (generate--list-of-nat-numbers-in-range-5 :exact-length total-test-count))
+	   (test-counts (generate--list-of-n-nat-numbers-in-range-5 :exact-length total-test-count))
 	   (tests-groups-alist (seq-map-indexed (-partial #'generate--fake-fresh-test-group-con test-counts) group-names)))
       (list tests-groups-alist total-test-count group-names))))
 
@@ -1656,7 +1656,7 @@ Values are hexadecimals."
     (list tests-groups-alist stats total-test-count group-names)))
 
 (defun generate--fake-completed-test-group-con-for-outcome-x (requested-outcome other-outcomes counts-for-requested-outcome counts-for-other-outcomes plist-of-ert-test-result-objects durations test-start-times test-end-times group-name index)
-  (let* ((other-outcomes (-zip-lists (map-keys other-outcomes) (generate-shuffle-list counts-for-other-outcomes)))
+  (-let* ((other-outcomes (-interleave (map-keys other-outcomes) (generate-shuffle-list counts-for-other-outcomes)))
 	 (count-for-requested-outcome (generate--nth-mod index counts-for-requested-outcome))
 	 (requested (list requested-outcome count-for-requested-outcome))
 	 (total-tests (+ count-for-requested-outcome (-sum counts-for-other-outcomes)))
@@ -1670,19 +1670,31 @@ Values are hexadecimals."
 					     :reasons test-reasons
 					     :results test-results))
 	 (all-stats (map-merge 'plist outcome-count-plist total-duration-reason-result)))
-  (cons group-name all-stats)))
+  (list (cons group-name all-stats) total-tests outcome-count-plist)))
 
 (defun generate--random-fake-completed-test-group-con-for-outcome-x-base (all-outcomes requested-outcome)
   (-let* ((exclusivep (generate--plist-get :exclusive (generate--plist-get requested-outcome all-outcomes)))
 	  (group-name (generate-random-word))
 	  (other-outcomes (seq-remove (-partial #'equal requested-outcome) all-outcomes))
 	  (length-of-other-outcomes (length other-outcomes))
-	  (counts-for-other-outcomes (if exclusivep (make-list length-of-other-outcomes 0) (generate--list-of-nat-numbers-in-range-5 :exact-length length-of-other-outcomes)))
-	  (plist-of-ert-test-result-objects (generate--plist-of-ert-test-result-objects all-outcomes))
-	  ((counts-for-requested-outcome test-start-times test-end-times durations) (funcall (-compose  (-partial #'mapcar #'ensure-list)
-													#'flatten-tree
-													(-juxt #'generate--random-nat-number-in-range-5 #'generate-random-lisp-timestamp-range-with-duration)))))
-    (generate--fake-completed-test-group-con-for-outcome-x requested-outcome other-outcomes counts-for-requested-outcome counts-for-other-outcomes plist-of-ert-test-result-objects durations test-start-times test-end-times group-name 0)))
+	  (counts-for-other-outcomes (if exclusivep (make-list length-of-other-outcomes 0) (generate--list-of-n-nat-numbers-in-range-5 :exact-length length-of-other-outcomes)))
+	  (test-durations (generate-list-of-n-nat-numbers :exact-length (length all-outcomes)))
+	  (test-outcome-duration-pairs (-zip-lists all-outcomes test-durations))
+	  (plist-of-ert-test-result-objects (generate--plist-of-ert-test-result-objects test-outcome-duration-pairs))
+	  ((start end duration) (generate-random-lisp-timestamp-range-with-duration))
+	  ((test-start-times test-end-times test-durations) (mapcar #'list (list start end duration)))
+	  (counts-for-requested-outcome (list (generate--random-nat-number-in-range-1-to-5))))	  
+
+    (generate--fake-completed-test-group-con-for-outcome-x
+     requested-outcome other-outcomes
+     counts-for-requested-outcome
+     counts-for-other-outcomes
+     plist-of-ert-test-result-objects
+     test-durations
+     test-start-times
+     test-end-times
+     group-name
+     0)))
 
 (defalias 'generate--random-fake-completed-test-group-con-for-outcome-x (-partial #'generate--random-fake-completed-test-group-con-for-outcome-x-base generate--DEFAULT-OUTCOMES))
 
@@ -1710,6 +1722,8 @@ Values are hexadecimals."
 	  test-end-times
 	  group-name index)))
 
+
+
 (defun generate--fake-completed-tests-groups-alist-base (all-outcomes requested-outcome)
   (-let* ((exclusivep (generate--plist-get :exclusive (generate--plist-get requested-outcome all-outcomes)))
 	  ((expected-group-names other-group-names) (generate--times-no-args-twice #'generate-random-list-of-strings))
@@ -1722,12 +1736,13 @@ Values are hexadecimals."
 	  (outcomes-with-reasons-results (map-filter (lambda (_ v) (identity (generate--plist-get :with-reasons-and-results v))) all-outcomes))
 	  (total-other-outcomes (length other-outcomes))
 	  (total-outcomes-with-reasons-results (length outcomes-with-reasons-results))
-	  (requested-counts-for-requested-outcome (generate--list-of-nat-numbers-in-range-5 :exact-length total-groups-for-requested-outcome))
-	  (requested-counts-for-other-outcomes (if exclusivep (make-list total-other-outcomes 0) (generate--list-of-nat-numbers-in-range-5 :exact-length total-other-outcomes)))
-	  ((test-start-times test-end-times durations) (generate--list-of-n-unzipped-starts-ends-durations (length groups)))
+	  (requested-counts-for-requested-outcome (generate--list-of-n-nat-numbers-in-range-5 :exact-length total-groups-for-requested-outcome))
+	  (requested-counts-for-other-outcomes (if exclusivep (make-list total-other-outcomes 0) (generate--list-of-n-nat-numbers-in-range-5 :exact-length total-other-outcomes)))
+	  ((test-start-times test-end-times test-durations) (generate--list-of-n-unzipped-starts-ends-durations (length groups)))
 	  (other-counts-for-requested-outcomes (make-list total-groups-for-other-outcomes 0))
-	  (other-counts-for-other-outcomes (generate--list-of-nat-numbers-in-range-5 :exact-length total-other-outcomes))
-	  (plist-of-ert-test-result-objects (generate-plist-of-ert-test-result-objects all-outcomes))
+	  (other-counts-for-other-outcomes (generate--list-of-n-nat-numbers-in-range-5 :exact-length total-other-outcomes))
+	  (test-outcome-duration-pairs (-zip-lists all-outcomes (generate-seq-take-infinite (length all-outcomes) test-durations)))
+	  (plist-of-ert-test-result-objects (generate--plist-of-ert-test-result-objects test-outcome-duration-pairs))
 	  (fake-data (list requested-outcome
 			   other-outcomes
 			   requested-counts-for-requested-outcome
@@ -1735,13 +1750,14 @@ Values are hexadecimals."
 			   other-counts-for-requested-outcomes
 			   other-counts-for-other-outcomes
 			   plist-of-ert-test-result-objects
-			   durations
+			   test-durations
 			   test-start-times
 			   test-end-times))
-	  (tests-groups-alist (seq-map-indexed (-compose (-applify #'generate--fake-completed-test-group-con-for-outcome-x)
+	  ((tests-groups-alist list-of-total-tests-count list-of-outcome-count-plists) (funcall (-compose #'-unzip #'seq-map-indexed) (-compose (-applify #'generate--fake-completed-test-group-con-for-outcome-x)
 							 (-partial #'generate--create-data-for-fake-completed-tests-groups fake-data))
-					       groups)))
-    (list tests-groups-alist total-groups-for-requested-outcome expected-group-names)))
+					       groups))
+	  (outcomes-counts-plist (apply (-partial #'map-merge-with 'plist #'+) list-of-outcome-count-plists)))
+    (list tests-groups-alist (-sum list-of-total-tests-count) expected-group-names outcomes-counts-plist)))
 
 (defalias 'generate--fake-completed-tests-groups-alist (-partial #'generate--fake-completed-tests-groups-alist-base generate--DEFAULT-OUTCOMES-FOR-SELF-TESTS))
 
@@ -1757,7 +1773,7 @@ Values are hexadecimals."
       (list (cons name index) test-result test-start-time test-end-time))))
 
 (defun generate--create-completed-ert-stats-for-tests-groups-alist (total-tests tests-groups-alist)
-  (-let* ((tests (funcall (-compose (-partial #'-flatten-n 1) (-partial #'map-apply #'generate--create-fresh-ert-tests-for-test-group)) tests-groups-alist))
+  (-let* ((tests (funcall (-compose (-partial #'-flatten-n 1) (-partial #'map-apply #'generate--create-fresh-ert-tests-for-test-group)) tests-groups-alist))	  
 	  ((test-map test-results test-start-times test-end-times) (funcall (-compose
 									     (-partial #'-flatten-n 1)
 									     (-juxt (-compose (-rpartial #'map-into 'hash-table) #'car) (-compose (-partial #'mapcar (-applify #'vector)) #'cdr))
@@ -1772,9 +1788,9 @@ Values are hexadecimals."
                      :test-end-times test-end-times)))
 
 (defun generate--random-fake-completed-tests-groups-alist-and-stats ()
-  (-let* (((tests-groups-alist total-test-count outcome-string-count-pairs group-names) (generate--random-fake-completed-tests-groups-alist))
-	  (stats (generate--create-completed-ert-stats-for-tests-groups-alist total-test-count tests-groups-alist)))
-    (list tests-groups-alist stats total-test-count outcome-string-count-pairs group-names)))
+  (-let* (((tests-groups-alist total-tests-count group-names outcomes-counts-plist) (generate--random-fake-completed-tests-groups-alist))
+	  (stats (generate--create-completed-ert-stats-for-tests-groups-alist total-tests-count tests-groups-alist)))
+    (list tests-groups-alist stats total-tests-count outcomes-counts-plist group-names)))
 
 (defconst generate--NUMBER-GENS
   (vector #'generate-random-float-between-0-and-1 #'generate-random-nat-number #'generate-random-negative-number))
