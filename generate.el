@@ -45,19 +45,19 @@
 (defconst generate--TEST-IDENTIFITER
   "gen-ert")
 (defconst generate--DEFAULT-OUTCOMES
-  (list :passed-expected :passed-unexpected :failed-unexpected :skipped :failed-expected :failed-unexpected))
+  (list :passed-expected :passed-unexpected :skipped :failed-unexpected :failed-expected))
 (defconst generate--DEFAULT-OUTCOMES-FOR-SELF-TESTS
   (list :passed-expected
-	(list :exclusive 't :with-reasons-and-results 'nil :message "passed as expected")
+	(list :exclusive 't :with-reasons-and-results 'nil :message "passed as expected" :summary "Passed as expected" :slot #'ert--stats-passed-expected)
 	:passed-unexpected
-	(list :exclusive 'nil :with-reasons-and-results 'nil :message "passed unexpectedly")
+	(list :exclusive 'nil :with-reasons-and-results 'nil :message "passed unexpectedly" :summary "Passed unexpectedly" :slot #'ert--stats-passed-unexpected)
 	:skipped
-	(list :exclusive 't :with-reasons-and-results 'nil :message "was skipped")
+	(list :exclusive 't :with-reasons-and-results 'nil :message "was skipped" :summary "Skipped" :slot #'ert--stats-skipped)
 	:failed-expected
-	(list :exclusive 't :with-reasons-and-results 'nil :message "failed as expected")
+	(list :exclusive 't :with-reasons-and-results 'nil :message "failed as expected" :summary "Failed as expected" :slot #'ert--stats-failed-expected)
 	:failed-unexpected
-	(list :exclusive 'nil :with-reasons-and-results 't :message "failed unexpectedly")))
-(defconst generate--TEST-GROUPS-ALIST
+	(list :exclusive 'nil :with-reasons-and-results 't :message "failed unexpectedly" :summary "Failed unexpectedly" :slot #'ert--stats-failed-unexpected)))
+(defconst generate--TEST-GROUPS-PLIST
   (list
    :total-tests 0
    :passed-expected 0
@@ -71,8 +71,14 @@
    :duration 0
    :test-start-times nil
    :test-end-times nil))
+
 (defconst generate--TEST-OUTCOME-STRINGS
   (list "passed as expected" "failed as expected" "were skipped" "failed unexpectedly" "passed unexpectedly"))
+
+
+(defconst generate--TEST-SUMMARY-STRINGS
+  (list "Passed as expected" "Failed as expected" "Skipped" "Failed unexpectedly" "Passed unexpectedly"))
+
 
 (defconst generate--PREDICATES
   (list
@@ -336,7 +342,7 @@ If NUM-RUNS is not specified, your test will be defined 100 times.
 	 (name-count-cons (generate--get-name-count-cons-for-list-of-tests split-tests)))
     (mapcar (generate--create-test-group-con stats key-to-set) name-count-cons)))
 
-(defalias 'generate--create-tests-groups-alist (-partial #'generate--create-tests-groups-alist-base generate--TEST-GROUPS-ALIST :total-tests))
+(defalias 'generate--create-tests-groups-alist (-partial #'generate--create-tests-groups-alist-base generate--TEST-GROUPS-PLIST :total-tests))
 
 (defun generate--creates-stats-predicate (list-of-outcomes outcome exclusive _ test-group-plist)
   (thunk-let* ((outcome-value (plist-get test-group-plist outcome #'equal))
@@ -362,7 +368,7 @@ If NUM-RUNS is not specified, your test will be defined 100 times.
 
 (defalias 'generate--stats-passed-unexpected (-partial #'generate--stats :passed-unexpected 'nil))
 
-(defalias 'generate--create-final-tests-stats (-compose #'length
+(defalias 'generate--create-final-tests-stats (-juxt #'length
 						       #'generate--stats-passed-expected
 						       #'generate--stats-failed-expected
 						       #'generate--stats-skipped
@@ -371,7 +377,7 @@ If NUM-RUNS is not specified, your test will be defined 100 times.
 
 (cl-defun generate--summary-message-helper (summary-message (outcome-string . outcome-total))
   (if (not (zerop outcome-total))
-      (concat summary-message "\n" (format "%s %s %s" outcome-total (if (g--gt1 outcome-total) "tests" "test") outcome-string))
+      (concat summary-message "\n" (format "%s  %s" outcome-string outcome-total))
     summary-message))
 
 (defun generate--summary-message (initial-value zipped-outcomes)
@@ -381,7 +387,7 @@ If NUM-RUNS is not specified, your test will be defined 100 times.
   (thunk-let* ((duration (plist-get test-stats :duration #'equal))
 	       (reasons (plist-get test-stats :reasons #'equal))
 	       (with-reasons (g--len-gt0 (getenv "EMACS_TEST_VERBOSE")))
-	       (results (plist-get test-stats :results #'equal))
+	       (results (mapcar (-compose #'backtrace-to-string #'ert-test-result-with-condition-backtrace) (plist-get test-stats :results #'equal)))
 	       (reasons-results (-zip-pair results reasons)))
     (message "%s %s \n Duration: %s" test-name message duration)
     (cond
@@ -396,9 +402,9 @@ If NUM-RUNS is not specified, your test will be defined 100 times.
 
 (defalias 'generate--skipped-message-printer (-partial #'generate--default-message-printer :skipped "was skipped" 'nil))
 
-(defalias 'generate--failed-unexpectedly-message-printer (-partial #'generate--default-message-printer :failed-unexpected "failed unexpectedly" 't))
+(defalias 'generate--failed-unexpected-message-printer (-partial #'generate--default-message-printer :failed-unexpected "failed unexpectedly" 't))
 
-(defalias 'generate--passed-unexpectedly-message-printer (-partial #'generate--default-message-printer :passed-unexpected "passed unexpectedly" 'nil))
+(defalias 'generate--passed-unexpected-message-printer (-partial #'generate--default-message-printer :passed-unexpected "passed unexpectedly" 'nil))
 
 (cl-defun generate--maybe-print-backtrace ((stats test result))
   (unless (ert-test-result-expected-p test result)
@@ -456,6 +462,35 @@ If NUM-RUNS is not specified, your test will be defined 100 times.
     (`(:passed :unexpected) :passed-unexpected)
     (`(:failed :unexpected) :failed-expected)
     (`(:skipped ,_) :skipped)))
+
+(defun generate--run-tests-batch-handle-run-started (selector tests-groups-alist event-args)
+  (cl-destructuring-bind (stats) event-args
+    (message "Running %s tests (%s, selector `%S')"
+	     (length tests-groups-alist)
+	     (ert--format-time-iso8601 (ert--stats-start-time stats))
+	     selector)))
+
+(defun generate--run-tests-batch-handle-run-ended-base (summary-strings tests-groups-alist event-args)
+  (-let* (((stats abortedp) event-args)
+	  ((total-tests (total-passed-as-expected . passed-as-expected)
+			(total-failed-as-expected . failed-as-expected)
+			(total-skipped . skipped)
+			(total-failed-unexpected . failed-unexpected)
+			(total-passed-unexpected . passed-unexpected))
+	   (generate--create-final-tests-stats tests-groups-alist))
+	  (zipped-outcomes (-zip-pair summary-strings (list total-passed-as-expected total-failed-as-expected total-skipped total-failed-unexpected total-passed-unexpected)))
+	  (duration (generate--time-diff (ert--stats-end-time stats) (ert--stats-start-time stats)))
+	  (start-time (format-time-string "%T" (ert--stats-start-time stats)))
+	  (start-at-message (format "Start at  %s" start-time))
+	  (duration-message (format "Duration  %s" duration))
+	  (total-tests-message (format "Total tests  %s" (length tests-groups-alist)))
+	  (breakdown-message "\nBreakdown:\n")
+	  (initial-message (s-join "\n" (list start-at-message duration-message total-tests-message breakdown-message))))
+    (if abortedp
+	(message "Aborted")
+      (message "%s" (generate--summary-message initial-message zipped-outcomes)))))
+
+(defalias 'generate--run-tests-batch-handle-run-ended (-partial #'generate--run-tests-batch-handle-run-ended-base generate--TEST-SUMMARY-STRINGS))
 
 (defalias 'generate--cons-vec (-partial #'cons 'vec) "Convert a list into a calc vector.")
 
@@ -979,7 +1014,7 @@ The number of lines will be equal to WORD-COUNT.
 
 (defalias 'generate-random-list-of-words (generate-default-convert-n-gen-to-random #'generate-list-of-n-words) "Returns a random list of words.")
 
-(defalias 'generate-random-list-of-unique-strings #'generate-random-list-of-words)
+(defalias 'generate-random-list-of-strings #'generate-random-list-of-words)
 
 (defun generate-random-sentence ()
   "Returns a random sentence."
@@ -1029,23 +1064,23 @@ Each generator will be called a random number of times."
 
 (defalias 'generate-random-multiline-string (-compose #'car #'generate--random-multiline-string-base))
 
-(defalias 'generate-list-of-n-nat-numbers #'generate-data "Returns a random list of natural numbers. The length of the list can be optionally specified using :MIN-LENGTH and :MAX-LENGTH or simply :EXACT-LENGTH. \(fn [:max-length INTEGER] [:min-length INTEGER] [:exact-length INTEGER])")
+(defalias 'generate-list-of-nat-numbers #'generate-data "Returns a random list of natural numbers. The length of the list can be optionally specified using :MIN-LENGTH and :MAX-LENGTH or simply :EXACT-LENGTH. \(fn [:max-length INTEGER] [:min-length INTEGER] [:exact-length INTEGER])")
 (defalias 'generate-list-of-nat-number-strings (-partial #'generate-data :item-transformer #'number-to-string) "Returns a random list of strings where each string is a natural numbers. The length of the list can be optionally specified using :MIN-LENGTH and :MAX-LENGTH or simply :EXACT-LENGTH. \(fn [:max-length INTEGER] [:min-length INTEGER] [:exact-length INTEGER])")
-(defalias 'generate-list-of-n-floats-between-0-and-1 (-partial #'generate-data :list-transformer (-compose #'generate--divide-list-values-by-max-list-value #'generate-seq-shuffle)) "Returns a random list of floats where each float is greater than or equal to zero and less than 1. The length of the list can be optionally specified using :MIN-LENGTH and :MAX-LENGTH or simply :EXACT-LENGTH. \(fn [:max-length INTEGER] [:min-length INTEGER] [:exact-length INTEGER])")
-(defalias 'generate-list-of-n-floats (-partial #'generate-data :list-transformer (-compose #'generate--divide-list-values-by-random-value #'generate-seq-shuffle)) "Returns a random list of floats. The length of the list can be optionally specified using :MIN-LENGTH and :MAX-LENGTH or simply :EXACT-LENGTH. \(fn [:max-length INTEGER] [:min-length INTEGER] [:exact-length INTEGER])")
-(defalias 'generate-random-list-of-strings (-partial #'generate-data :min-length 20 :item-transformer #'generate--get-next-lower-alpha-character :list-transformer (-compose #'generate-seq-split-random #'seq--into-string)) "Returns a random list of strings.")
+(defalias 'generate-list-of-floats-between-0-and-1 (-partial #'generate-data :list-transformer (-compose #'generate--divide-list-values-by-max-list-value #'generate-seq-shuffle)) "Returns a random list of floats where each float is greater than or equal to zero and less than 1. The length of the list can be optionally specified using :MIN-LENGTH and :MAX-LENGTH or simply :EXACT-LENGTH. \(fn [:max-length INTEGER] [:min-length INTEGER] [:exact-length INTEGER])")
+(defalias 'generate-list-of-floats (-partial #'generate-data :list-transformer (-compose #'generate--divide-list-values-by-random-value #'generate-seq-shuffle)) "Returns a random list of floats. The length of the list can be optionally specified using :MIN-LENGTH and :MAX-LENGTH or simply :EXACT-LENGTH. \(fn [:max-length INTEGER] [:min-length INTEGER] [:exact-length INTEGER])")
+;;(defalias 'generate-random-list-of-strings (-partial #'generate-data :min-length 20 :item-transformer #'generate--get-next-lower-alpha-character :list-transformer (-compose #'generate-seq-split-random #'seq--into-string)) "Returns a random list of strings.")
 (defalias 'generate-random-list-of-lists-nat-numbers (-partial #'generate-data :list-transformer #'generate-seq-split-random) "Returns a random list of lists of natural numbers.")
 
-(cl-defun generate-list-of-n-nat-numbers-in-range (range &key (list-transformer #'generate-shuffle-list) min-length max-length exact-length)
+(cl-defun generate-list-of-nat-numbers-in-range (range &key (list-transformer #'generate-shuffle-list) min-length max-length exact-length)
     "Returns a list with COUNT numbers where each number is within the bounds of RANGE.
 \(fn INTEGER INTEGER)"
   (generate-data :list-transformer list-transformer :item-transformer (-partial #'generate--non-zero-bounded-modular-addition range 0) :exact-length exact-length :min-length min-length :max-length max-length))
 
-(defalias 'generate--list-of-n-nat-numbers-in-range-5 (-partial #'generate-list-of-n-nat-numbers-in-range generate--FIVERANGE))
+(defalias 'generate--list-of-n-nat-numbers-in-range-5 (-partial #'generate-list-of-nat-numbers-in-range generate--FIVERANGE))
 
-(defalias 'generate--list-of-n-nat-numbers-in-range-10 (-partial #'generate-list-of-n-nat-numbers-in-range generate--TENRANGE))
+(defalias 'generate--list-of-n-nat-numbers-in-range-10 (-partial #'generate-list-of-nat-numbers-in-range generate--TENRANGE))
 
-(defalias 'generate--list-of-nat-numbers-in-range-25 (-partial #'generate-list-of-n-nat-numbers-in-range generate--ONETOTWENTYFIVE))
+(defalias 'generate--list-of-nat-numbers-in-range-25 (-partial #'generate-list-of-nat-numbers-in-range generate--ONETOTWENTYFIVE))
 
 (defconst generate--LIST-ITEM-TRANSFORMERS
   (list #'generate--get-next-lower-alpha-character
@@ -1060,13 +1095,13 @@ Each generator will be called a random number of times."
 (defun generate--list-of-n-random-values (transformers)
   (lambda (n)
     (let ((item-transformer (generate-seq-take-random-value-from-seq transformers)))
-      (generate-list-of-n-nat-numbers :item-transformer item-transformer :exact-length n))))
+      (generate-list-of-nat-numbers :item-transformer item-transformer :exact-length n))))
 
 (defalias 'generate-list-of-n-random-values (generate--list-of-n-random-values generate--LIST-ITEM-TRANSFORMERS))
 
-(defalias 'generate-vector-of-n-nat-numbers (-compose #'generate--applify-vector #'generate-list-of-n-nat-numbers) "Returns a random vector of natural numbers. The length of the vector can be optionally specified using :MIN-LENGTH and :MAX-LENGTH or simply :EXACT-LENGTH. \(fn [:max-length INTEGER] [:min-length INTEGER] [:exact-length INTEGER])")
-(defalias 'generate-vector-of-n-floats-between-0-and-1 (-compose #'generate--applify-vector #'generate-list-of-n-floats-between-0-and-1) "Returns a random vector of floats where each float is greater than or equal to zero and less than 1. The length of the vector can be optionally specified using :MIN-LENGTH and :MAX-LENGTH or simply :EXACT-LENGTH. \(fn [:max-length INTEGER] [:min-length INTEGER] [:exact-length INTEGER])")
-(defalias 'generate-vector-of-n-floats (-compose #'generate--applify-vector #'generate-list-of-n-floats) "Returns a random vector of floats. The length of the vector can be optionally specified using :MIN-LENGTH and :MAX-LENGTH or simply :EXACT-LENGTH. \(fn [:max-length INTEGER] [:min-length INTEGER] [:exact-length INTEGER])")
+(defalias 'generate-vector-of-n-nat-numbers (-compose #'generate--applify-vector #'generate-list-of-nat-numbers) "Returns a random vector of natural numbers. The length of the vector can be optionally specified using :MIN-LENGTH and :MAX-LENGTH or simply :EXACT-LENGTH. \(fn [:max-length INTEGER] [:min-length INTEGER] [:exact-length INTEGER])")
+(defalias 'generate-vector-of-floats-between-0-and-1 (-compose #'generate--applify-vector #'generate-list-of-floats-between-0-and-1) "Returns a random vector of floats where each float is greater than or equal to zero and less than 1. The length of the vector can be optionally specified using :MIN-LENGTH and :MAX-LENGTH or simply :EXACT-LENGTH. \(fn [:max-length INTEGER] [:min-length INTEGER] [:exact-length INTEGER])")
+(defalias 'generate-vector-of-floats (-compose #'generate--applify-vector #'generate-list-of-floats) "Returns a random vector of floats. The length of the vector can be optionally specified using :MIN-LENGTH and :MAX-LENGTH or simply :EXACT-LENGTH. \(fn [:max-length INTEGER] [:min-length INTEGER] [:exact-length INTEGER])")
 (defalias 'generate-random-vector-of-strings (-compose #'generate--applify-vector #'generate-random-list-of-strings) "Returns a random vector of strings.")
 (defalias 'generate-random-vector-of-lists-nat-numbers (-partial #'generate-data :list-transformer (-compose #'generate--applify-vector #'generate-seq-split-random)) "Returns a random vector of lists of natural numbers.")
 (defalias 'generate-random-vector-of-vectors-nat-numbers (-compose #'generate--seq-map-vector #'generate-random-vector-of-lists-nat-numbers) "Returns a random vector of vectors of natural numbers.")
@@ -1105,11 +1140,11 @@ Each generator will be called a random number of times."
 (defalias 'generate--seq-map-format-pad (-partial #'seq-map #'generate--number-to-padded-string))
 (defalias 'generate--join-time-values (-partial #'s-join ":"))
 
-(defun generate--time-diff (t1 t2)
+(defun generate--time-diff (end-time start-time)
   "Return the difference between the two times, in seconds.
 T1 and T2 are time values (as returned by `current-time' for example).
 Stolen from tramp."
-  (float-time (time-subtract t1 t2)))
+  (float-time (time-subtract end-time start-time)))
 
 (defalias 'generate--get-lisp-timestamp-range-duration (-compose (-applify #'generate--time-diff) #'reverse))
 
@@ -1175,7 +1210,7 @@ Each timestamp will be in the (TICKS . HZ) format.")
 (defun generate--list-of-n-lisp-timestamp-ranges-helper (inc-bottom inc-top)
   (lambda (n)
     (-let* (((min max hz range-length) (generate--create-timestamp-range-around-current-time inc-bottom inc-top))
-	    (range-indices (generate-list-of-n-nat-numbers-in-range (list 0 range-length) :exact-length (* n 2)))
+	    (range-indices (generate-list-of-nat-numbers-in-range (list 0 range-length) :exact-length (* n 2)))
 	    (timestamps (generate--timestamp-range-indices-to-timestamps hz min range-indices))
 	    (raw-ranges (-partition 2 timestamps)))
       (mapcar (-rpartial #'sort :key #'car) raw-ranges))))
@@ -1390,13 +1425,13 @@ Execute BODY in buffer."
 
 (defalias 'generate-random-punctuation (-partial #'generate-seq-take-random-value-from-seq generate--PUNCTUATION) "Returns a random member of generate-PUNCTUATION.")
 
-(defalias 'generate-random-color (-compose (-applify #'color-rgb-to-hex) (-partial #'generate-list-of-n-floats-between-0-and-1 :exact-length 3)))
+(defalias 'generate-random-color (-compose (-applify #'color-rgb-to-hex) (-partial #'generate-list-of-floats-between-0-and-1 :exact-length 3)))
 
 (defun generate-list-of-n-colors (n)
   "Returns a list of N colors.
 Values are hexadecimals."
   (let* ((float-count (* n 3))
-	 (floats (generate-list-of-n-floats-between-0-and-1 :exact-length float-count)))
+	 (floats (generate-list-of-floats-between-0-and-1 :exact-length float-count)))
     (funcall (-compose (-partial #'mapcar (-applify #'color-rgb-to-hex)) #'-partition) 3 floats)))
 
 (defalias 'generate-random-list-of-colors (generate-default-convert-n-gen-to-random #'generate-list-of-n-colors))
@@ -1423,7 +1458,7 @@ Values are hexadecimals."
 	 (list-of-args (generate-list-of-n-symbols n))
 	 (list-of-locals (generate-list-of-n-alists n))
 	 (list-of-flags (generate-seq-take-infinite-shuffled n (list :debug-on-exit :source-available nil)))
-	 (list-of-positions (sort (generate-list-of-n-nat-numbers :exact-length n))))
+	 (list-of-positions (sort (generate-list-of-nat-numbers :exact-length n))))
     (seq-map-indexed (lambda (pos i) (backtrace-make-frame
 				      :evald (nth i list-of-evalds)
 				      :fun (nth i list-of-funs)
@@ -1629,7 +1664,7 @@ Values are hexadecimals."
   (lambda (counts name index)
     (let ((copied-stats (copy-sequence stats)))
       (cons name (generate--plist-put :total-tests (nth index counts) copied-stats)))))
-(defalias 'generate--fake-fresh-test-group-con (generate--fake-fresh-test-group-con-base generate--TEST-GROUPS-ALIST))
+(defalias 'generate--fake-fresh-test-group-con (generate--fake-fresh-test-group-con-base generate--TEST-GROUPS-PLIST))
 
 (defun generate--fake-fresh-tests-groups-alist-base (all-outcomes)
   (lambda ()
@@ -1656,21 +1691,20 @@ Values are hexadecimals."
     (list tests-groups-alist stats total-test-count group-names)))
 
 (defun generate--fake-completed-test-group-con-for-outcome-x (requested-outcome other-outcomes counts-for-requested-outcome counts-for-other-outcomes plist-of-ert-test-result-objects durations test-start-times test-end-times group-name index)
-  (-let* ((other-outcomes (-interleave (map-keys other-outcomes) (generate-shuffle-list counts-for-other-outcomes)))
+  (-let* ((other-outcomes-plist (-interleave other-outcomes (generate-shuffle-list counts-for-other-outcomes)))
 	 (count-for-requested-outcome (generate--nth-mod index counts-for-requested-outcome))
-	 (requested (list requested-outcome count-for-requested-outcome))
-	 (total-tests (+ count-for-requested-outcome (-sum counts-for-other-outcomes)))
-	 (duration (funcall (-compose (-partial #'* total-tests) #'generate--nth-mod) index durations))
-	 (outcome-count-plist (map-merge 'plist other-outcomes requested))
-	 ((test-results test-reasons) (generate--take-from-plist-of-ert-test-results plist-of-ert-test-result-objects outcome-count-plist))
-	 (total-duration-reason-result (list :total-tests total-tests
+	 (absolute-outcomes-counts-plist (map-merge 'plist other-outcomes-plist (list requested-outcome count-for-requested-outcome)))
+	 (absolute-total-tests (+ count-for-requested-outcome (-sum counts-for-other-outcomes)))
+	 (duration (funcall (-compose (-partial #'* absolute-total-tests) #'generate--nth-mod) index durations))
+	 ((test-results test-reasons) (generate--take-from-plist-of-ert-test-results plist-of-ert-test-result-objects absolute-outcomes-counts-plist))
+	 (total-duration-reason-result (list :total-tests absolute-total-tests
 					     :duration duration
-					     :test-start-times (make-list total-tests (generate--nth-mod index test-start-times))
-					     :test-end-times (make-list total-tests (generate--nth-mod index test-end-times))
+					     :test-start-times (make-vector absolute-total-tests (generate--nth-mod index test-start-times))
+					     :test-end-times (make-vector absolute-total-tests (generate--nth-mod index test-end-times))
 					     :reasons test-reasons
-					     :results test-results))
-	 (all-stats (map-merge 'plist outcome-count-plist total-duration-reason-result)))
-  (list (cons group-name all-stats) total-tests outcome-count-plist)))
+					     :results (apply #'vector test-results)))
+	 (all-stats (map-merge 'plist absolute-outcomes-counts-plist total-duration-reason-result)))
+  (list (cons group-name all-stats) absolute-total-tests absolute-outcomes-counts-plist)))
 
 (defun generate--random-fake-completed-test-group-con-for-outcome-x-base (all-outcomes requested-outcome)
   (-let* ((exclusivep (generate--plist-get :exclusive (generate--plist-get requested-outcome all-outcomes)))
@@ -1678,12 +1712,12 @@ Values are hexadecimals."
 	  (other-outcomes (seq-remove (-partial #'equal requested-outcome) all-outcomes))
 	  (length-of-other-outcomes (length other-outcomes))
 	  (counts-for-other-outcomes (if exclusivep (make-list length-of-other-outcomes 0) (generate--list-of-n-nat-numbers-in-range-5 :exact-length length-of-other-outcomes)))
-	  (test-durations (generate-list-of-n-nat-numbers :exact-length (length all-outcomes)))
+	  (test-durations (generate-list-of-nat-numbers :exact-length (length all-outcomes)))
 	  (test-outcome-duration-pairs (-zip-lists all-outcomes test-durations))
 	  (plist-of-ert-test-result-objects (generate--plist-of-ert-test-result-objects test-outcome-duration-pairs))
 	  ((start end duration) (generate-random-lisp-timestamp-range-with-duration))
 	  ((test-start-times test-end-times test-durations) (mapcar #'list (list start end duration)))
-	  (counts-for-requested-outcome (list (generate--random-nat-number-in-range-1-to-5))))	  
+	  (counts-for-requested-outcome (list (generate--random-nat-number-in-range-1-to-5))))
 
     (generate--fake-completed-test-group-con-for-outcome-x
      requested-outcome other-outcomes
@@ -1720,9 +1754,8 @@ Values are hexadecimals."
 	  durations
 	  test-start-times
 	  test-end-times
-	  group-name index)))
-
-
+	  group-name
+	  index)))
 
 (defun generate--fake-completed-tests-groups-alist-base (all-outcomes requested-outcome)
   (-let* ((exclusivep (generate--plist-get :exclusive (generate--plist-get requested-outcome all-outcomes)))
@@ -1732,7 +1765,7 @@ Values are hexadecimals."
 	  (groups-for-requested-outcome (mapcar (-rpartial #'list 't) expected-group-names))
 	  (groups-for-other-outcomes (mapcar (-rpartial #'list 'nil) other-group-names))
 	  (groups (generate-shuffle-list (append groups-for-other-outcomes groups-for-requested-outcome)))
-	  (other-outcomes (map-remove (lambda (k _) (equal k requested-outcome)) all-outcomes))
+	  (other-outcomes (funcall (-compose (-partial #'remove requested-outcome) #'map-keys) all-outcomes))
 	  (outcomes-with-reasons-results (map-filter (lambda (_ v) (identity (generate--plist-get :with-reasons-and-results v))) all-outcomes))
 	  (total-other-outcomes (length other-outcomes))
 	  (total-outcomes-with-reasons-results (length outcomes-with-reasons-results))
@@ -1753,27 +1786,30 @@ Values are hexadecimals."
 			   test-durations
 			   test-start-times
 			   test-end-times))
-	  ((tests-groups-alist list-of-total-tests-count list-of-outcome-count-plists) (funcall (-compose #'-unzip #'seq-map-indexed) (-compose (-applify #'generate--fake-completed-test-group-con-for-outcome-x)
-							 (-partial #'generate--create-data-for-fake-completed-tests-groups fake-data))
-					       groups))
-	  (outcomes-counts-plist (apply (-partial #'map-merge-with 'plist #'+) list-of-outcome-count-plists)))
-    (list tests-groups-alist (-sum list-of-total-tests-count) expected-group-names outcomes-counts-plist)))
+	  ((tests-groups-alist list-of-total-tests-count list-of-outcome-count-plists) (funcall (-compose #'-unzip #'seq-map-indexed) (-compose
+																       (-applify #'generate--fake-completed-test-group-con-for-outcome-x)
+																       (-partial #'generate--create-data-for-fake-completed-tests-groups fake-data))
+												groups))
+    (outcomes-counts-plist (if (length= list-of-outcome-count-plists 1)
+			       (car list-of-outcome-count-plists)
+			     (apply (-partial #'map-merge-with 'plist #'+) list-of-outcome-count-plists))))
+    (list tests-groups-alist expected-group-names other-group-names (-sum list-of-total-tests-count) outcomes-counts-plist)))
 
 (defalias 'generate--fake-completed-tests-groups-alist (-partial #'generate--fake-completed-tests-groups-alist-base generate--DEFAULT-OUTCOMES-FOR-SELF-TESTS))
 
 (defalias 'generate--random-fake-completed-tests-groups-alist (-compose #'generate--fake-completed-tests-groups-alist #'generate--random-ert-test-outcome))
 
 (defun generate--create-completed-ert-stats-for-tests-groups-alist-mapper (tests-groups-alist)
-  (-lambda (test index)
+  (-lambda (test index)    
     (-let* (((name . number) (generate--chop-each-test-name-helper test))
 	    (test-group-stats (map-elt tests-groups-alist name))
-	    (test-result (nth number (generate--plist-get :results tests-groups-alist)))
-	    (test-start-time (nth number (generate--plist-get :results tests-groups-alist)))
-	    (test-end-time (nth number (generate--plist-get :results tests-groups-alist))))
+	    (test-result (aref (generate--plist-get :results test-group-stats) number))
+	    (test-start-time (aref (generate--plist-get :test-start-times test-group-stats) number))
+	    (test-end-time (aref (generate--plist-get :test-end-times test-group-stats) number)))
       (list (cons name index) test-result test-start-time test-end-time))))
 
 (defun generate--create-completed-ert-stats-for-tests-groups-alist (total-tests tests-groups-alist)
-  (-let* ((tests (funcall (-compose (-partial #'-flatten-n 1) (-partial #'map-apply #'generate--create-fresh-ert-tests-for-test-group)) tests-groups-alist))	  
+  (-let* ((tests (funcall (-compose (-applify #'vector) (-partial #'-flatten-n 1) (-partial #'map-apply #'generate--create-fresh-ert-tests-for-test-group)) tests-groups-alist))	  
 	  ((test-map test-results test-start-times test-end-times) (funcall (-compose
 									     (-partial #'-flatten-n 1)
 									     (-juxt (-compose (-rpartial #'map-into 'hash-table) #'car) (-compose (-partial #'mapcar (-applify #'vector)) #'cdr))
@@ -1781,24 +1817,28 @@ Values are hexadecimals."
 									     (-partial #'seq-map-indexed (generate--create-completed-ert-stats-for-tests-groups-alist-mapper tests-groups-alist)))
 									     tests)))
     (make-ert--stats :selector 't
+		     :start-time (--min-by (> (car it) (car other)) (seq-into test-start-times 'list))
+		     :end-time (--max-by (> (car it) (car other)) (seq-into test-end-times 'list))
                      :tests tests
                      :test-map test-map
                      :test-results test-results
                      :test-start-times test-start-times
                      :test-end-times test-end-times)))
 
-(defun generate--random-fake-completed-tests-groups-alist-and-stats ()
-  (-let* (((tests-groups-alist total-tests-count group-names outcomes-counts-plist) (generate--random-fake-completed-tests-groups-alist))
-	  (stats (generate--create-completed-ert-stats-for-tests-groups-alist total-tests-count tests-groups-alist)))
-    (list tests-groups-alist stats total-tests-count outcomes-counts-plist group-names)))
+(defun generate--fake-completed-tests-groups-alist-and-stats (requested-outcome)
+  (-let* (((tests-groups-alist group-names-for-requested-outcome other-group-names absolute-total-tests-count absolute-outcomes-counts-plist) (generate--fake-completed-tests-groups-alist requested-outcome))
+	  (stats (generate--create-completed-ert-stats-for-tests-groups-alist absolute-total-tests-count tests-groups-alist)))
+    (list tests-groups-alist stats group-names-for-requested-outcome other-group-names absolute-total-tests-count absolute-outcomes-counts-plist)))
+
+(defalias 'generate--random-fake-completed-tests-groups-alist-and-stats (-compose #'generate--fake-completed-tests-groups-alist-and-stats #'generate--random-ert-test-outcome))
 
 (defconst generate--NUMBER-GENS
   (vector #'generate-random-float-between-0-and-1 #'generate-random-nat-number #'generate-random-negative-number))
 
 (defconst generate--LIST-GENS
-  (vector #'generate-list-of-n-nat-numbers
-      #'generate-list-of-n-floats-between-0-and-1
-      #'generate-list-of-n-floats
+  (vector #'generate-list-of-nat-numbers
+      #'generate-list-of-floats-between-0-and-1
+      #'generate-list-of-floats
       #'generate-random-list-of-strings
       #'generate-random-list-of-lists-nat-numbers))
 
@@ -1811,8 +1851,8 @@ Values are hexadecimals."
 (defconst generate--VECTOR-GENS
   (vector
    #'generate-vector-of-n-nat-numbers
-   #'generate-vector-of-n-floats
-   #'generate-vector-of-n-floats-between-0-and-1
+   #'generate-vector-of-floats
+   #'generate-vector-of-floats-between-0-and-1
    #'generate-random-vector-of-strings
    #'generate-random-vector-of-vectors-nat-numbers
    #'generate-random-vector-of-lists-nat-numbers))

@@ -155,20 +155,20 @@
 
 (generate-ert-deftest-n-times generate-call-random-function ()
   :num-runs 100
-  (-let* (((expected-super-set test-list) (funcall (-compose (-juxt #'identity #'generate--seq-map-cl-constantly) #'generate-list-of-n-nat-numbers)))
+  (-let* (((expected-super-set test-list) (funcall (-compose (-juxt #'identity #'generate--seq-map-cl-constantly) #'generate-list-of-nat-numbers)))
 	  (actual-value (generate-call-random-function test-list)))
     (should (member actual-value expected-super-set))))
 
 (generate-ert-deftest-n-times generate-call-random-function-n-times ()
   :num-runs 100
-  (-let* ((((expected-super-set test-list) test-calls) (funcall (-juxt (-compose (-juxt #'identity #'generate--seq-map-cl-constantly) #'generate-list-of-n-nat-numbers) #'generate--random-nat-number-in-range-255)))
+  (-let* ((((expected-super-set test-list) test-calls) (funcall (-juxt (-compose (-juxt #'identity #'generate--seq-map-cl-constantly) #'generate-list-of-nat-numbers) #'generate--random-nat-number-in-range-255)))
 	  (actual-seq (generate-call-random-function-n-times test-calls test-list)))
     (should (cl-subsetp actual-seq expected-super-set))
     (should (g--len-eq actual-seq test-calls))))
 
 (generate-ert-deftest-n-times generate-call-n-random-functions ()
   :num-runs 100
-  (-let* (((expected-super-set test-list) (funcall (-compose (-juxt #'identity #'generate--seq-map-cl-constantly) #'generate-list-of-n-nat-numbers)))
+  (-let* (((expected-super-set test-list) (funcall (-compose (-juxt #'identity #'generate--seq-map-cl-constantly) #'generate-list-of-nat-numbers)))
 	  (test-n (generate--seq-random-chunk-length expected-super-set))
 	  (actual-list (generate-call-n-random-functions test-n test-list)))
     (should (cl-subsetp actual-list expected-super-set))
@@ -194,7 +194,7 @@
 
 (generate-ert-deftest-n-times generate--seq-take-last-for-lists ()
   :num-runs 100
-  (-let* (((test-list test-chunk-length) (funcall (-compose (-juxt #'identity #'generate--seq-random-chunk-length) #'generate-list-of-n-nat-numbers)))
+  (-let* (((test-list test-chunk-length) (funcall (-compose (-juxt #'identity #'generate--seq-random-chunk-length) #'generate-list-of-nat-numbers)))
 	  ((actual-result actual-result-length) (funcall (-compose #'generate--identity-and-seq-length #'generate--seq-take-last) test-chunk-length test-list)))
     (should (eql actual-result-length test-chunk-length))
     (should (cl-subsetp actual-result test-list))))
@@ -254,7 +254,7 @@
 
 (generate-ert-deftest-n-times generate--seq-random-chunk-length ()
 :num-runs 100
-    (-let* (((test-chunk-length test-list-length) (funcall (-compose (-juxt #'generate--seq-random-chunk-length #'seq-length) #'generate-list-of-n-nat-numbers) :min-length 2)))
+    (-let* (((test-chunk-length test-list-length) (funcall (-compose (-juxt #'generate--seq-random-chunk-length #'seq-length) #'generate-list-of-nat-numbers) :min-length 2)))
       (should (g--lt test-chunk-length test-list-length))
       (should (g--gte test-chunk-length 1))))
 
@@ -363,7 +363,7 @@
 
 (generate-ert-deftest-n-times generate-seq-random-chunk-of-size-n-list ()
 :num-runs 100
-    (-let* (((test-chunk-length test-list) (funcall (-compose (-juxt #'generate--seq-random-chunk-length #'identity) #'generate-list-of-n-nat-numbers)))
+    (-let* (((test-chunk-length test-list) (funcall (-compose (-juxt #'generate--seq-random-chunk-length #'identity) #'generate-list-of-nat-numbers)))
 	    ((actual-chunk actual-chunk-length) (funcall (-compose #'generate--identity-and-seq-length #'generate-seq-random-chunk-of-size-n) test-chunk-length test-list)))
       (should (listp actual-chunk))
       (should (cl-subsetp actual-chunk test-list))))
@@ -466,15 +466,15 @@
 	   (test-min-length (+ test-max-length test-plus)))
     (should-error (generate-data :min-length test-max :max-length test-min-length))))
 
-(generate-ert-deftest-n-times generate-list-of-n-nat-numbers ()
+(generate-ert-deftest-n-times generate-list-of-nat-numbers ()
 :num-runs 100
-   (let ((test-list (generate-list-of-n-nat-numbers)))
+   (let ((test-list (generate-list-of-nat-numbers)))
     (should (generate--seq-every-p-nat-number test-list))))
 
-(generate-ert-deftest-n-times generate-list-of-n-nat-numbers-with-exact-length ()
+(generate-ert-deftest-n-times generate-list-of-nat-numbers-with-exact-length ()
 :num-runs 100
    (let* ((test-exact-length (generate--random-nat-number-in-range-25))
-	 (test-list (generate-list-of-n-nat-numbers :exact-length test-exact-length)))
+	 (test-list (generate-list-of-nat-numbers :exact-length test-exact-length)))
     (should (equal (seq-count #'natnump test-list) test-exact-length))))
 
 (generate-ert-deftest-n-times generate-list-of-n-floats-1 ()
@@ -492,11 +492,11 @@
     (let ((test-list (generate-random-list-of-lists-nat-numbers)))
     (should (generate--seq-every-p-list test-list))))
 
-(generate-ert-deftest-n-times generate-list-of-n-nat-numbers-in-range ()
+(generate-ert-deftest-n-times generate-list-of-nat-numbers-in-range ()
   :num-runs 100
   (let* ((test-range (generate-random-nat-number-range))
 	 (test-list-size (generate--random-nat-number-in-range-25))
-	 (actual-list (generate-list-of-n-nat-numbers-in-range test-range :exact-length test-list-size))
+	 (actual-list (generate-list-of-nat-numbers-in-range test-range :exact-length test-list-size))
 	 (actual-random-value (generate-seq-take-random-value-from-seq actual-list)))
     (should (generate--in-range-exclusive-p test-range actual-random-value))
     (should (length= actual-list test-list-size))))
