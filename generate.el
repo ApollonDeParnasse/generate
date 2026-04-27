@@ -409,8 +409,8 @@ If NUM-RUNS is not specified, your test will be defined 100 times.
 	   (test-number (substring test-name test-number-start-index)))
       (cons name (string-to-number test-number)))))
 
-(defalias 'generate--chop-each-test-name-helper (generate--chop-each-test-name-helper-base generate--TEST-IDENTIFITER))
-(defalias 'generate--chop-each-test-name (-partial #'mapcar #'generate--chop-each-test-name-helper))
+(defalias 'generate--chop-test-name (generate--chop-test-name-helper generate--TEST-IDENTIFIER))
+(defalias 'generate--chop-each-test-name (-partial #'mapcar #'generate--chop-test-name))
 
 (cl-defun generate--get-name-count-cons-for-list-of-tests-helper ((name . vals))
   (let* ((counts (mapcar #'cdr vals)))
