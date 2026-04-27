@@ -260,7 +260,7 @@
 
 (generate-ert-deftest-n-times generate--fake-fresh-tests-groups-alist ()
   :num-runs 0
-  (-let* (((actual-tests-groups-alist actual-total-test-count actual-group-names) (generate--fake-fresh-tests-groups-alist))
+  (-let* (((actual-tests-groups-alist actual-total-relative-test-count actual-total-absolute-test-count actual-group-names) (generate--fake-fresh-tests-groups-alist))
 	  ((actual-group-name . actual-group-stats) (generate-seq-take-random-value-from-seq actual-tests-groups-alist))
 	  ((&plist
 	    :total-tests
@@ -869,9 +869,10 @@
     (cl-letf (((symbol-function 'message) (lambda (format-string &rest args)
 					    (push (apply #'format format-string args) messages))))
       (-let* ((test-selector (generate-random-string))
-	     ((tests-groups-alist test-stats expected-total-test-count _) (generate--fake-fresh-tests-groups-alist-and-stats))
-	     (test-event-args (list test-stats))
+	     ((tests-groups-alist ert-test-stats expected-total-test-count _) (generate--fake-fresh-tests-groups-alist-and-stats))
+	     (test-event-args (list ert-test-stats))
 	     (actual-message (progn (generate--run-tests-batch-handle-run-started test-selector tests-groups-alist test-event-args) (apply #'concat (reverse messages)))))
+	(print actual-message)
 	(should (s-contains-p (format "Running %s tests" expected-total-test-count) actual-message))))))
 
 (generate-ert-deftest-n-times generate--run-tests-batch-handle-test-ended-no-message ()
