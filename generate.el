@@ -461,12 +461,49 @@ If NUM-RUNS is not specified, your test will be defined 100 times.
 
 (defalias 'generate--stats-passed-unexpected (-partial #'generate--stats :passed-unexpected 'nil))
 
-(defalias 'generate--create-final-tests-stats (-juxt #'length
-						       #'generate--stats-passed-expected
-						       #'generate--stats-failed-expected
-						       #'generate--stats-skipped
-						       #'generate--stats-failed-unexpected
-						       #'generate--stats-passed-unexpected))
+(defalias 'generate--create-final-test-stats (-juxt #'generate--stats-passed-expected
+						     #'generate--stats-failed-expected
+						     #'generate--stats-skipped
+						     #'generate--stats-failed-unexpected
+						     #'generate--stats-passed-unexpected))
+
+(defsubst generate--print-unexpected-outcome-message-for-test-group (default-outcomes-plist test-outcome test-group-stats test-name total-tests duration)
+  (-let* ((sign (generate--plist-get :test-outcome-sign (generate--plist-get test-outcome default-outcomes-plist)))
+	  (expected-outcome (generate--plist-get :compatible (generate--plist-get test-outcome default-outcomes-plist)))
+	  (expected-outcome-count (generate--plist-get expected-outcome test-group-stats)))
+    (generate--print-expected-outcome-message-for-test-group default-outcomes-plist expected-outcome test-name expected-outcome-count total-tests duration sign)))
+
+(cl-defsubst generate--print-expected-outcome-message-for-test-group (default-outcomes-plist test-outcome test-name outcome-count total-tests duration &optional sign)
+  (let* ((outcome-attributes (generate--plist-get test-outcome default-outcomes-plist))
+	 (outcome-string (funcall (generate--plist-get :summary-message outcome-attributes) outcome-count))
+	 (outcome-sign (or sign (generate--plist-get :test-outcome-sign outcome-attributes))))
+    (message "%s %s > %s/%s %s %s (%f sec)" outcome-sign test-name outcome-count total-tests (if (> outcome-count 1) "tests" "test") outcome-string duration)))
+
+(defun generate--print-final-test-group-stats-base (default-outcomes-plist)
+  (lambda (test-group-stats test-name)
+    (-let* ((alist (list (cons test-name test-group-stats)))
+	    (zipped-outcomes (generate--create-final-test-stats alist))
+	   ((&plist :total-tests :duration) test-group-stats)
+	   ((test-outcome . _) (car (map-filter (lambda (_ val) (not (zerop val))) zipped-outcomes)))
+	   (expectedp (generate--plist-get :expectedp (generate--plist-get test-outcome default-outcomes-plist))))
+      (if expectedp
+	  (generate--print-expected-outcome-message-for-test-group default-outcomes-plist test-outcome test-name total-tests total-tests duration)
+	(generate--print-unexpected-outcome-message-for-test-group default-outcomes-plist test-outcome test-group-stats test-name total-tests duration)))))
+
+  (defalias 'generate--print-final-test-group-stats (generate--print-final-test-group-stats-base generate--DEFAULT-OUTCOMES-PLIST))
+
+(defun generate--maybe-print-final-group-stats (test-group-stats test-name)
+  (map-let (:total-tests :completed-tests) test-group-stats
+    (when (equal total-tests completed-tests)
+      (generate--print-final-test-group-stats test-group-stats test-name))))
+
+(defun generate--print-test-run-stats-base (default-outcomes-plist)
+  (lambda (initial-message tests-groups-alist)
+    (let* ((zipped-outcomes (generate--create-final-test-stats tests-groups-alist))
+	   (stat-messages (map-apply (lambda (key val) (cons (generate--plist-get :breakdown-message (generate--plist-get key default-outcomes-plist)) val)) zipped-outcomes)))
+      (message "%s" (generate--summary-message initial-message stat-messages)))))
+
+(defalias 'generate--print-test-run-stats (generate--print-test-run-stats-base generate--DEFAULT-OUTCOMES-PLIST))
 
 (cl-defun generate--summary-message-helper (summary-message (outcome-string . outcome-total))
   (if (not (zerop outcome-total))
