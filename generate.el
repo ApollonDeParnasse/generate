@@ -1240,31 +1240,28 @@ calculations and the length of the range relative
 to the HZ. INC-BOTTOM and INC-TOP can be used
 to widen or shrink the range of timestamps."
   (-let* ((current-time-list nil)
-	  ((time . hz) (current-time))
-	  (min (round (- time (/ time inc-bottom))))
-	  (max (+ (* time inc-top) time))
-	  (range-length (floor (- max min) hz)))
-    (list min max hz range-length)))
+	  ((curr-secs . hz) (current-time))
+	  (min (- curr-secs (* hz minus-bottom)))
+	  (range-length (+ plus-top minus-bottom)))
+    (list min hz range-length)))
 
-(cl-defun generate--lisp-timestamp-helper (inc-bottom inc-top)
+(cl-defun generate--lisp-timestamp-helper (minus-bottom plus-top)
   "Returns a random Lisp timestamp.
 The timestamp will be in the (TICKS . HZ) format.
 INC-BOTTOM and INC-TOP can be sed to widen
 or shrink the range of possible timestamps."
-  (lambda ()
-    (-let* (((min max hz _) (generate--create-timestamp-range-around-current-time inc-bottom inc-top))
-	    (new-time (generate-random-nat-number-in-range (list min max))))
-      (cons new-time hz))))
+  (-let* (((min hz range-length) (generate--create-timestamp-range-around-current-time minus-bottom plus-top))
+	  (range-index (generate--random-nat-number-between-0-and range-length)))
+    (generate--timestamp-range-index-to-timestamp hz min range-index)))
 
-(cl-defun generate--lisp-timestamp-range-helper (inc-bottom inc-top)
+(cl-defun generate--lisp-timestamp-range-helper (minus-bottom minus-top)
   "Returns a random Lisp timestamp.
 The timestamp will be in the (TICKS . HZ) format.
 INC-BOTTOM and INC-TOP can be used to widen
 or shrink the range of possible timestamps."
-  (lambda ()
-    (-let* (((min max hz range-length) (generate--create-timestamp-range-around-current-time inc-bottom inc-top))
-	    (range-indices (generate-two-sorted-random-nat-numbers-in-range (list 0 range-length))))
-      (generate--timestamp-range-indices-to-timestamps hz min range-indices))))
+  (-let* (((min hz range-length) (generate--create-timestamp-range-around-current-time minus-bottom minus-top))
+	  (range-indices (generate-two-sorted-random-nat-numbers-in-range (list 0 range-length))))
+    (generate--timestamp-range-indices-to-timestamps hz min range-indices)))
 
 (defun generate-random-12-hour-time-string ()
   "Returns a random time string in 12-hour format."
