@@ -1651,7 +1651,7 @@ Values are hexadecimals."
 	(`(nil should-not) (list assert-symbol should-val))))))
 
 (defun generate--catchall-should-pcase (n val)
-  (pcase (mod n 3)
+  (pcase-exhaustive (mod n 3)
     (0 (list 'equal val val))
     (1 (list 'equal (list val) (list val)))
     (2 (list 'equal (vector val) (vector val)))))
@@ -1659,7 +1659,7 @@ Values are hexadecimals."
 (defalias 'generate--catchall-should (generate--make-should-form-gen-for-type-x #'generate--catchall-should-pcase))
 
 (defun generate--number-should-pcase (n number)
-  (pcase (mod n 5)
+  (pcase-exhaustive (mod n 5)
     (0 (list 'numberp number))
     (1 (list 'plusp (abs number)))
     (2 (list 'minusp (* 1 (abs number))))
@@ -1669,7 +1669,7 @@ Values are hexadecimals."
 (defalias 'generate--number-should (generate--make-should-form-gen-for-type-x #'generate--number-should-pcase))
 
 (defun generate--symbol-should-pcase (n symbol)
-  (pcase (mod n 3)
+  (pcase-exhaustive (mod n 3)
     (0 (list 'symbolp symbol))
     (1 (equal (list 'symbol-name symbol) (list 'symbol-name symbol)))
     (2 (generate--catchall-should-pcase n symbol))))
@@ -1677,7 +1677,7 @@ Values are hexadecimals."
 (defalias 'generate--symbol-should (generate--make-should-form-gen-for-type-x #'generate--symbol-should-pcase))
 
 (defun generate--seq-should-pcase (n seq)
-  (pcase (mod n 5)
+  (pcase-exhaustive (mod n 5)
     (0 (list 'seqp seq))
     (1 (list 'equal (list 'seq-positions seq) (list 'seq-positions seq)))
     (2 (list 'equal (list 'seq-uniq seq) (list 'seq-uniq seq)))
@@ -1687,7 +1687,7 @@ Values are hexadecimals."
 (defalias 'generate--seq-should (generate--make-should-form-gen-for-type-x #'generate--seq-should-pcase))
 
 (defun generate--map-should-pcase (n map)
-  (pcase (mod n 5)
+  (pcase-exhaustive (mod n 5)
     (0 (list 'mapp map))
     (1 (list 'equal (list 'map-keys map) (list 'map-keys map)))
     (2 (list 'equal (list 'map-values map) (list 'map-values map)))
@@ -1700,7 +1700,7 @@ Values are hexadecimals."
 (cl-defun generate--should-form-for-type-x (&key passing assert-symbol)
   (cl-function (lambda (&optional val)
 	       (let ((random-val (or val (generate-random-value))))
-		 (pcase random-val
+		 (pcase-exhaustive random-val
 		   ((pred seqp) (generate--seq-should passing assert-symbol random-val))
 		   ((pred mapp) (generate--map-should passing assert-symbol random-val))
 		   ((pred symbolp) (generate--symbol-should passing assert-symbol random-val))
