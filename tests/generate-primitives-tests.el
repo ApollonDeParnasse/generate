@@ -99,7 +99,18 @@
     (should (generate--seq-every-p-between-0-and-1-inclusive actual-list))))
 
 (generate-ert-deftest-n-times generate-random-float ()
+(generate-ert-deftest-n-times generate--lisp-timestampp-true ()
   :num-runs 100
+  (should (decode-time (generate-random-lisp-timestamp))))
+
+(generate-ert-deftest-n-times generate--lisp-timestampp-false-one ()
+  :num-runs 100
+  (should-not (generate--lisp-timestampp (generate-list-of-nat-numbers))))
+
+(generate-ert-deftest-n-times generate--lisp-timestampp-false-two ()
+  :num-runs 100
+  (should-not (generate--lisp-timestampp (cons (generate-random-nat-number) 0))))
+
   (should (floatp (generate-random-float))))
 
 (generate-ert-deftest-n-times generate-random-float-between-0-and-1 ()

@@ -96,6 +96,15 @@
    #'characterp
    #'booleanp))
 
+(defconst generate--SECONDS-IN-AN-HOUR
+  (* 60 60))
+(defconst generate--SECONDS-IN-A-DAY
+  (* 60 60 24))
+(defconst generate--SECONDS-IN-A-MONTH
+  (* 60 60 24 30))
+(defconst generate--SECONDS-IN-A-YEAR
+  (* 60 60 24 30 12))
+
 (defconst generate--FIVERANGE
   (list 1 5))
 (defconst generate--ZEROTENRANGE
@@ -140,8 +149,8 @@
   1000000000000)
 (defconst generate--PUNCTUATION
   (list "," ":" "." ";" "/" "-"))
-(defconst generate--INC-BOTTOM-TIME-RANGE-MIN 100.0 "Constant used for the creation of the minimum of the Lisp timestamp range.")
-(defconst generate--INC-TOP-TIME-RANGE-MAX 0.25 "Constant used for the creation of the maximum of the Lisp timestamp range.")
+
+
 (defconst generate--FILE-EXTENSIONS (list "ascii" "ascx" "asm" "asmx" "asp" "aspx" "atom" "au3" "awk" "bas"
 					  "bash" "bashrc" "bat" "bbcolors" "bcp" "bdsgroup" "bdsproj" "bib"
 					  "bowerrc" "c" "cbl" "cc" "cfc" "cfg" "cfm" "cfml" "cgi" "cjs" "clj"
@@ -521,6 +530,24 @@ If NUM-RUNS is not specified, your test will be defined 100 times.
   (<= min x max))
 
 (defalias 'generate--between-0-and-1-inclusive-p (-partial #'generate--in-range-inclusive-p (list 0 1)) "Is VALUE greater than or equal to zero and less than or equal 1?")
+
+(cl-defgeneric generate--get-min-lisp-timestamp (timestamps)
+  (--min-by (> (car it) (car other)) timestamps))
+
+(cl-defmethod generate--get-min-lisp-timestamp ((timestamps vector))
+  (generate--get-min-lisp-timestamp (seq-into timestamps 'list)))
+
+(cl-defgeneric generate--get-max-lisp-timestamp (timestamps)
+  (--max-by (> (car it) (car other)) timestamps))
+
+(cl-defmethod generate--get-max-lisp-timestamp ((timestamps vector))
+  (generate--get-max-lisp-timestamp (seq-into timestamps 'list)))
+
+(defun generate--lisp-timestampp (val)
+  "Is VAL a timestamp."
+  (when val
+    (let ((current-time-list nil))
+      (ignore-errors (when (decode-time val) 't)))))
 
 (cl-defun generate--scale-float-to-range ((min max) float)
   "Scale FLOAT until it is greater than or equal to MIN and less than MAX."
@@ -1200,27 +1227,33 @@ or shrink the range of possible timestamps."
 
 (defalias 'generate-random-time-string (-partial #'generate-call-random-function (list #'generate-random-24-hour-time-string #'generate-random-12-hour-time-string)))
 
-(defalias 'generate-random-lisp-timestamp (generate--lisp-timestamp-helper generate--INC-BOTTOM-TIME-RANGE-MIN generate--INC-TOP-TIME-RANGE-MAX)
+(cl-defun generate-random-lisp-timestamp (&optional (range-size generate-lisp-timestamp-range-size))
   "Returns a random lisp timestamp.
-The timestamp will be in the (TICKS . HZ) format.")
+RANGE-SIZE should be seconds. 
+It will be used to create the range of times from
+which the timestamp will be selected. Each timestamp will be in the (TICKS . HZ) format."
+  (generate--lisp-timestamp-helper (floor range-size 2) (floor range-size 2)))
 
-(defalias 'generate-random-lisp-timestamp-range (generate--lisp-timestamp-range-helper generate--INC-BOTTOM-TIME-RANGE-MIN generate--INC-TOP-TIME-RANGE-MAX)
+(cl-defun generate-random-lisp-timestamp-range (&optional (range-size generate-lisp-timestamp-range-size))
   "Returns a random lisp timestamp range.
-Each timestamp will be in the (TICKS . HZ) format.")
+RANGE-SIZE should be seconds. 
+It will be used to create the range of times from
+which the timestamp will be selected. Each timestamp will be in the (TICKS . HZ) format."
+  (generate--lisp-timestamp-range-helper (floor range-size 2) (floor range-size 2)))
 
 (defalias 'generate-random-lisp-timestamp-range-with-duration (-compose #'generate--lisp-timestamp-range-duration-helper #'generate-random-lisp-timestamp-range))
 
-(defun generate--list-of-n-lisp-timestamp-ranges-helper (inc-bottom inc-top)
-  (lambda (n)
-    (-let* (((min max hz range-length) (generate--create-timestamp-range-around-current-time inc-bottom inc-top))
+(defun generate--list-of-n-lisp-timestamp-ranges-helper (n minus-bottom minus-top)
+    (-let* (((min hz range-length) (generate--create-timestamp-range-around-current-time minus-bottom minus-top))
 	    (range-indices (generate-list-of-nat-numbers-in-range (list 0 range-length) :exact-length (* n 2)))
 	    (timestamps (generate--timestamp-range-indices-to-timestamps hz min range-indices))
 	    (raw-ranges (-partition 2 timestamps)))
-      (mapcar (-rpartial #'sort :key #'car) raw-ranges))))
+      (mapcar (-rpartial #'sort :key #'car) raw-ranges)))
 
-(defalias 'generate-list-of-n-lisp-timestamp-ranges (generate--list-of-n-lisp-timestamp-ranges-helper generate--INC-BOTTOM-TIME-RANGE-MIN generate--INC-TOP-TIME-RANGE-MAX)
-"Returns N lisp timestamp ranges.
-Timestamps are in the (TICKS . HZ) format.")
+(cl-defun generate-list-of-n-lisp-timestamp-ranges (n &optional (range-size generate--SECONDS-IN-AN-HOUR))
+  "Returns N lisp timestamp ranges.
+Timestamps are in the (TICKS . HZ) format."
+  (generate--list-of-n-lisp-timestamp-ranges-helper n (floor range-size 2) (floor range-size 2)))
 
 (defalias 'generate--list-of-n-unzipped-starts-ends-durations (-compose #'-unzip-lists (-partial #'mapcar #'generate--lisp-timestamp-range-duration-helper) #'generate-list-of-n-lisp-timestamp-ranges))
 
