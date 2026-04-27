@@ -581,13 +581,15 @@ If NUM-RUNS is not specified, your test will be defined 100 times.
       (ert-test-quit
        (message "Quit during %S" (ert-test-name test))))))
 
-(defun generate--create-test-result-key (actual-expected)
-  (pcase actual-expected
-    (`(:passed :expected) :passed-expected)
-    (`(:failed :expected) :failed-expected)
-    (`(:passed :unexpected) :passed-unexpected)
-    (`(:failed :unexpected) :failed-expected)
+(defun generate--create-test-result-key (expected-result matches-expected-result)
+  (pcase-exhaustive (list expected-result matches-expected-result)
+    (`(:passed t) :passed-expected)
+    (`(:failed t) :failed-expected)
+    (`(:passed nil) :passed-unexpected)
+    (`(:failed nil) :failed-expected)
     (`(:skipped ,_) :skipped)))
+
+
 
 (defun generate--run-tests-batch-handle-run-started (selector tests-groups-alist event-args)
   (cl-destructuring-bind (stats) event-args
