@@ -50,6 +50,26 @@
     (should (seq-every-p (-partial #'eql expected-num) actual-seq))
     (should (eql actual-seq-length test-calls))))
 
+(generate-ert-deftest-n-times generate--zip-pair-longest ()
+  :num-runs 0
+  (-let* (((test-group-one test-group-two) (generate--times-no-args-twice #'generate-random-list-of-strings))
+	  (expected-length (-max (mapcar #'length (list test-group-one test-group-two))))
+	  (actual-list (generate--zip-pair-longest test-group-one test-group-two))
+	  ((actual-car . actual-cdr) (generate-seq-take-random-value-from-seq actual-list)))
+    (should (length= actual-list expected-length))
+    (should (member actual-car test-group-one))
+    (should (member actual-cdr test-group-two))))
+
+(generate-ert-deftest-n-times generate--zip-pair-first ()
+  :num-runs 0
+  (-let* (((test-group-one test-group-two) (generate--times-no-args-twice #'generate-random-list-of-strings))
+	  (expected-length (length test-group-one))
+	  (actual-list (generate--zip-pair-first test-group-one test-group-two))
+	  ((actual-car . actual-cdr) (generate-seq-take-random-value-from-seq actual-list)))
+    (should (length= actual-list expected-length))
+    (should (member actual-car test-group-one))
+    (should (member actual-cdr test-group-two))))
+
 (generate-ert-deftest-n-times generate--convert-calc-value-into-lisp ()
   :num-runs 100
   (should (floatp (generate--convert-calc-value-into-lisp (math-gaussian-float)))))

@@ -214,6 +214,11 @@
 (defalias 'generate--equal-one (-partial #'eql 1) "equal 1?")
 (defalias 'generate--not-equal (-not #'equal) "not equal?")
 
+(defun generate-nth-mod (n list &optional delta)
+  (nth (mod (+ n (or delta 1)) (length list)) list))
+
+(defalias 'generate--compact (-partial #'seq-filter #'identity))
+
 (defun generate--plist-get (prop plist)
   (plist-get plist prop #'equal))
 
@@ -285,6 +290,41 @@ Each function call will receive the current call number as its argument."
   (generate--times n (lambda (_) (funcall func))))
 
 (defalias 'generate--times-no-args-twice (-partial #'generate--times-no-args 2) "Call FUNC twice.")
+
+(cl-defun generate--zip-pair-longest-helper ((order-short short-list))
+  (if (zerop order-short)
+      (lambda (long-x index)
+	(let ((short-x (generate-nth-mod index short-list)))
+	  (cons short-x long-x)))
+    (lambda (long-x index)
+      (let ((short-x (generate-nth-mod index short-list)))
+	(cons long-x short-x)))))
+
+(defun generate--zip-pair-longest (list-one list-two)
+  "Zip LIST-ONE and LIST-TWO together.
+
+Make a pair with the head of each list, followed by a pair with
+the second element of each list, and so on.  The number of pairs
+returned is equal to the length of the longest input list."
+  (thunk-let* ((length-one (length list-one))
+	       (length-two (length list-two))
+	       (sorted-lists (if (g--gt length-one length-two) (list (list 0 list-one) (list 1 list-two)) (list (list 1 list-two) (list 0 list-one))))
+	       (longest-list (cadr (car sorted-lists)))
+	       (shortest-list (cadr sorted-lists)))
+    (if (equal length-one length-two)
+	(-zip-pair list-one list-two)
+      (seq-map-indexed (generate--zip-pair-longest-helper shortest-list) longest-list))))
+
+(defun generate--zip-pair-first (list-one list-two)
+  "Zip LIST1 and LIST2 together.
+
+Make a pair with the head of each list, followed by a pair with
+the second element of each list, and so on.  The number of pairs
+returned is equal to the length of LIST-ONE."
+  (-let* (((length-one length-two) (mapcar #'length (list list-one list-two))))
+    (if (g--lte length-one length-two)
+	(-zip-pair list-one list-two)
+      (seq-map-indexed (generate--zip-pair-longest-helper (list 1 list-two)) list-one))))
 
 ;;;###autoload
 (cl-defmacro generate-ert-deftest-n-times (name () &body docstring-keys-and-body)
