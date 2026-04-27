@@ -223,10 +223,6 @@
   (plist-get plist prop #'equal))
 
 (defun generate--plist-put (prop val plist)
-  (plist-put plist prop val #'equal))
-
-(defun generate--nth-mod (n list &optional delta)
-  (nth (mod (+ n (or delta 1)) (length list)) list))
   (declare (side-effect-free t))
   (let ((new-plist (copy-sequence plist)))
     (plist-put new-plist prop val #'equal)))
@@ -426,7 +422,7 @@ If NUM-RUNS is not specified, your test will be defined 100 times.
 
 (defun generate--create-test-group-con (stats key-to-set)
   (-lambda ((name . count))
-    (cons name (generate--plist-put key-to-set count (copy-sequence stats)))))
+    (cons name (generate--plist-put key-to-set count stats))))
 
 (defun generate--create-tests-groups-alist-base (stats key-to-set tests)
   (let* ((split-tests (generate--chop-each-test-name tests))
