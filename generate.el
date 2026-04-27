@@ -1783,34 +1783,27 @@ Values are hexadecimals."
 
 (defun generate--fake-fresh-test-group-con-base (stats)
   (lambda (counts name index)
-    (let ((copied-stats (copy-sequence stats)))
-      (cons name (generate--plist-put :total-tests (nth index counts) copied-stats)))))
+    (cons name (generate--plist-put :total-tests (nth index counts) stats))))
 (defalias 'generate--fake-fresh-test-group-con (generate--fake-fresh-test-group-con-base generate--TEST-GROUPS-PLIST))
 
 (defun generate--fake-fresh-tests-groups-alist-base (all-outcomes)
   (lambda ()
-    (let* ((group-names (generate-random-list-of-strings))
-	   (total-test-count (length group-names))
-	   (test-counts (generate--list-of-n-nat-numbers-in-range-5 :exact-length total-test-count))
+    (let* ((group-names (generate-random-list-of-unique-strings))
+	   (total-relative-tests-count (length group-names))
+	   (test-counts (generate--list-of-n-nat-numbers-in-range-5 :exact-length total-relative-tests-count))
+	   (total-absolute-tests-count (-sum test-counts))
 	   (tests-groups-alist (seq-map-indexed (-partial #'generate--fake-fresh-test-group-con test-counts) group-names)))
-      (list tests-groups-alist total-test-count group-names))))
+      (list tests-groups-alist total-relative-tests-count total-absolute-tests-count group-names))))
 
-(defalias 'generate--fake-fresh-tests-groups-alist (generate--fake-fresh-tests-groups-alist-base generate--DEFAULT-OUTCOMES-FOR-SELF-TESTS))
-
-(defun generate--create-fresh-ert-tests-for-test-group (test-name test-stats)
-  (-let* (((&plist :total-tests) test-stats)
-	  (tests (generate--ert-test-unfolder (cons total-tests test-name))))
-    tests))
+(defalias 'generate--fake-fresh-tests-groups-alist (generate--fake-fresh-tests-groups-alist-base generate--DEFAULT-OUTCOMES-PLIST))
 
 (defun generate--create-fresh-ert-stats-for-tests-groups-alist (tests-groups-alist)
-  (let ((tests (funcall (-compose (-partial #'-flatten-n 1) (-partial #'map-apply #'generate--create-fresh-ert-tests-for-test-group)) tests-groups-alist)))
+  (let ((tests (generate--create-vector-of-tests-for-tests-groups-alist tests-groups-alist)))
     (ert--make-stats tests 't)))
 
 (defun generate--fake-fresh-tests-groups-alist-and-stats ()
-  (-let* (((tests-groups-alist total-test-count group-names) (generate--fake-fresh-tests-groups-alist))
+  (-let* (((tests-groups-alist total-relative-tests-count total-absolute-tests-count group-names) (generate--fake-fresh-tests-groups-alist))
 	  (stats (generate--create-fresh-ert-stats-for-tests-groups-alist tests-groups-alist)))
-    (list tests-groups-alist stats total-test-count group-names)))
-
 (defun generate--fake-completed-test-group-con-for-outcome-x (requested-outcome other-outcomes counts-for-requested-outcome counts-for-other-outcomes plist-of-ert-test-result-objects durations test-start-times test-end-times group-name index)
   (-let* ((other-outcomes-plist (-interleave other-outcomes (generate-shuffle-list counts-for-other-outcomes)))
 	 (count-for-requested-outcome (generate--nth-mod index counts-for-requested-outcome))
