@@ -227,6 +227,23 @@
 
 (defun generate--nth-mod (n list &optional delta)
   (nth (mod (+ n (or delta 1)) (length list)) list))
+  (declare (side-effect-free t))
+  (let ((new-plist (copy-sequence plist)))
+    (plist-put new-plist prop val #'equal)))
+
+;; code was copied from gv
+(gv-define-expander generate--plist-get
+  (lambda (do prop plist)
+    (macroexp-let2 macroexp-copyable-p key prop
+      (gv-letplace (getter setter) plist
+        (macroexp-let2 nil p `(cdr (plist-member ,getter ,key))
+          (funcall do
+                   `(car ,p)
+                   (lambda (val)
+                     `(if ,p
+                          (setcar ,p ,val)
+                        ,(funcall setter
+                                  `(cons ,key (cons ,val ,getter)))))))))))
 
 (defalias 'generate--first-and-last-item  (-juxt #'-first-item #'-last-item))
 (defalias 'generate--iterate-plus-one  (-partial #'-iterate #'1+))
