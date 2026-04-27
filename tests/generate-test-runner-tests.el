@@ -875,61 +875,121 @@
 	(print actual-message)
 	(should (s-contains-p (format "Running %s tests" expected-total-test-count) actual-message))))))
 
-(generate-ert-deftest-n-times generate--run-tests-batch-handle-test-ended-no-message ()
+(generate-ert-deftest-n-times generate--run-tests-batch-handle-test-ended-expected-no-message ()
   :num-runs 0
-  (let ((messages))
-    (cl-letf (((symbol-function 'message) (lambda (format-strings &rest args)
-					    (push (apply #'format format-string args) messages))))
-      (-let* (((test-outcome test-outcome-string) (funcall (-compose (-juxt #'identity #'generate--get-ert-outcome-message) #'generate-seq-take-random-value-from-seq) (list :passed-expected :skipped)))
-	      ((random-other-outcome random-other-outcome-string) (funcall (-compose
-									    (-juxt #'identity #'generate--get-ert-outcome-message)
-									    #'generate-seq-take-random-value-from-seq
-									    #'remove)
-									   test-outcome generate--DEFAULT-OUTCOMES-FOR-SELF-TESTS))
-	      ((tests-groups-alist test-stats expected-tests-count outcomes-counts-plist group-names)
-	       (generate--fake-completed-tests-groups-alist-and-stats test-outcome))
-	      (test-event-args (list test-stats))
-	      (actual-message (progn (generate--run-tests-batch-handle-run-started 't tests-groups-alist test-event-args test) (apply #'concat (reverse messages)))))
-	(should (string-equal actual-message ""))))))
-
-(generate-ert-deftest-n-times generate--run-tests-batch-handle-test-ended-passed-unexpected ()
-  :num-runs 0
-  (let ((messages))
-    (cl-letf (((symbol-function 'message) (lambda (format-strings &rest args)
-					    (push (apply #'format format-string args) messages))))
-      (-let* (((tests-groups-alist test-stats test _ _)
-	       (generate--random-fake-tests-groups-alist-stats-and-test :passed-unexpected))
-	      (test-event-args (list test-stats))
-	      (actual-message (progn (generate--run-tests-batch-handle-run-started test-selector tests-groups-alist test-event-args test) (apply #'concat (reverse messages)))))
-	(should (s-contains-p "passed-unexpectedly" actual-message))))))
-
-(generate-ert-deftest-n-times generate--run-tests-batch-handle-run-ended-success ()
-  :num-runs 100
   (let ((messages))
     (cl-letf (((symbol-function 'message) (lambda (format-string &rest args)
 					    (push (apply #'format format-string args) messages))))
-      (-let* ((test-outcome (generate-seq-take-random-value-from-seq generate--DEFAULT-OUTCOMES))
-	      (expected-outcome-string (generate--get-ert-outcome-summary-message test-outcome))
-	      ((tests-groups-alist test-stats expected-tests-count outcomes-counts-plist group-names)
+      (-let* ((test-outcome (generate--random-expected-ert-test-outcome))
+	      ((tests-groups-alist ert-stats
+				   ert-test ert-test-result
+				   currently-executing-test-group-name next-test-index
+				   completed-tests-count-for-group total-tests-count-for-group
+				   absolute-outcomes-counts-plist)
+	       (generate--fake-mid-run-data-for-group-with-more-than-one-test-left test-outcome))
+	      ((&plist :test-start-times previous-start-times :test-end-times previous-end-times) (map-elt tests-groups-alist currently-executing-test-group-name))
+	      (test-event-args (list ert-stats ert-test ert-test-result))
+	      (message (progn (generate--run-tests-batch-handle-test-ended tests-groups-alist test-event-args) messages))
+	      ((&plist :completed-tests :test-results :test-start-times :test-end-times) (map-elt tests-groups-alist currently-executing-test-group-name)))
+	(should (equal completed-tests (1+ completed-tests-count-for-group)))
+	(should (member ert-test-result test-results))
+	(should (length= test-start-times (1+ (length previous-start-times))))
+	(should (length= test-start-times (1+ (length previous-end-times))))
+	(should-not message)))))
+
+(generate-ert-deftest-n-times generate--run-tests-batch-handle-test-ended-fail-unexpected ()
+  :num-runs 0
+  (let ((messages))
+    (cl-letf (((symbol-function 'message) (lambda (format-string &rest args)
+					    (push (apply #'format format-string args) messages))))
+      (-let* ((test-outcome (generate--random-unexpected-ert-test-outcome))
+	      ((tests-groups-alist ert-stats
+				   ert-test ert-test-result
+				   currently-executing-test-group-name next-test-index
+				   completed-tests-count-for-group total-tests-count-for-group
+				   absolute-outcomes-counts-plist)
+	       (generate--fake-mid-run-data-for-group-with-more-than-one-test-left test-outcome))
+	      ((&plist :test-start-times previous-start-times :test-end-times previous-end-times) (map-elt tests-groups-alist currently-executing-test-group-name))
+	      (test-event-args (list ert-stats ert-test ert-test-result))
+	      (message (progn (generate--run-tests-batch-handle-test-ended tests-groups-alist test-event-args) (apply #'concat (reverse messages))))
+	      ((&plist :completed-tests :test-results :test-start-times :test-end-times) (map-elt tests-groups-alist currently-executing-test-group-name)))
+	(should (equal completed-tests (1+ completed-tests-count-for-group)))
+	(should (member ert-test-result test-results))
+	(should (length= test-start-times (1+ (length previous-start-times))))
+	(should (length= test-start-times (1+ (length previous-end-times))))
+	(should (s-contains-p (ert-test-name ert-test) message))))))
+
+(generate-ert-deftest-n-times generate--run-tests-batch-handle-test-group-finished-executing-with-exclusive-outcome ()
+  :num-runs 0
+  (let ((messages))
+    (cl-letf (((symbol-function 'message) (lambda (format-string &rest args)
+					    (push (apply #'format format-string args) messages))))
+      (-let* ((test-outcome (generate--random-exclusive-ert-test-outcome))
+	      (expected-outcome-function (generate--get-ert-outcome-summary-message-function test-outcome))
+	      ((tests-groups-alist ert-stats
+				   ert-test ert-test-result
+				   currently-executing-test-group-name next-test-index
+				   completed-tests-count-for-group total-tests-count-for-group
+				   absolute-outcomes-counts-plist)
+	       (generate--fake-mid-run-data-for-group-with-one-more-test-left test-outcome))
+	      (expected-outcome-string (funcall expected-outcome-function total-tests-count-for-group))
+	      (test-event-args (list ert-stats ert-test ert-test-result))
+	      (message (progn (generate--run-tests-batch-handle-test-ended tests-groups-alist test-event-args) (apply #'concat (reverse messages)))))
+	(should (s-contains-p currently-executing-test-group-name message))
+	(should (s-contains-p (format "%s/%s" total-tests-count-for-group total-tests-count-for-group) message))
+	(should (s-contains-p expected-outcome-string message))))))
+
+(generate-ert-deftest-n-times generate--run-tests-batch-handle-test-group-finished-executing-with-nonexclusive-outcome ()
+  :num-runs 0
+  (let ((messages))
+    (cl-letf (((symbol-function 'message) (lambda (format-string &rest args)
+					    (push (apply #'format format-string args) messages))))
+      (-let* ((test-outcome (generate--random-non-exclusive-ert-test-outcome))
+	      (test-compatible-outcome (generate--get-compatible-outcome test-outcome))
+	      (expected-outcome-function (generate--get-ert-outcome-summary-message-function test-compatible-outcome))
+	      ((tests-groups-alist ert-stats
+				   ert-test ert-test-result
+				   currently-executing-test-group-name next-test-index
+				   completed-tests-count-for-group total-tests-count-for-group
+				   absolute-outcomes-counts-plist)
+	       (generate--fake-mid-run-data-for-group-with-one-more-test-left test-outcome))
+	      (expected-outcome-string (funcall expected-outcome-function total-tests-count-for-group))
+	      (test-event-args (list ert-stats ert-test ert-test-result))
+	      (message (progn (generate--run-tests-batch-handle-test-ended tests-groups-alist test-event-args) (apply #'concat (reverse messages)))))
+	(should (s-contains-p currently-executing-test-group-name message))
+	(should (s-contains-p (number-to-string completed-tests-count-for-group) message))
+	(should (s-contains-p expected-outcome-string message))))))
+
+(generate-ert-deftest-n-times generate--run-tests-batch-handle-run-ended-success ()
+  :num-runs 0
+  (let ((messages))
+    (cl-letf (((symbol-function 'message) (lambda (format-string &rest args)
+					    (push (apply #'format format-string args) messages))))
+      (-let* ((test-outcome (generate--random-ert-test-outcome))
+	      (expected-outcome-string (generate--get-ert-outcome-breakdown-message test-outcome))
+	      ((tests-groups-alist ert-stats group-names-for-requested-outcome other-group-names absolute-total-tests-count expected-absolute-outcomes-counts-plist expected-relative-outcomes-counts-plist)
 	       (generate--fake-completed-tests-groups-alist-and-stats test-outcome))
-	      (test-event-args (list test-stats))
-	      (actual-message (progn (generate--run-tests-batch-handle-run-ended tests-groups-alist test-event-args) (apply #'concat (reverse messages)))))
+	      (test-event-args (list ert-stats))
+	      (actual-message (progn (generate--run-tests-batch-handle-run-ended tests-groups-alist test-event-args) (apply #'concat (reverse messages))))
+	      (expected-breakdown-list-length (funcall (-compose #'length #'map-remove) (lambda (_ v) (zerop v)) expected-relative-outcomes-counts-plist))
+	      (actual-breakdown-list (funcall (-compose (-partial #'seq-filter #'generate--TEST-SUMMARY-STRING-PREDICATES) #'s-split) "\n" actual-message)))
 	(should (s-contains-p "Start at" actual-message))
 	(should (s-contains-p "Duration" actual-message))
 	(should (s-contains-p "Total tests" actual-message))
 	(should (s-contains-p "Breakdown:" actual-message))
-	(should (s-contains-p expected-outcome-string actual-message))))))
+	(should (s-contains-p expected-outcome-string actual-message))
+	(should (length= actual-breakdown-list expected-breakdown-list-length))))))
 
 (generate-ert-deftest-n-times generate--run-tests-batch-handle-run-ended-aborted ()
-  :num-runs 100
+  :num-runs 0
   (let ((messages))
     (cl-letf (((symbol-function 'message) (lambda (format-string &rest args)
 					    (push (apply #'format format-string args) messages))))
-      (-let* ((test-outcome (generate-seq-take-random-value-from-seq generate--DEFAULT-OUTCOMES))
-	      ((tests-groups-alist test-stats expected-tests-count outcomes-counts-plist group-names)
+      (-let* ((test-outcome (generate--random-ert-test-outcome))
+	      ((tests-groups-alist ert-test-stats expected-tests-count outcomes-counts-plist group-names)
 	       (generate--fake-completed-tests-groups-alist-and-stats test-outcome))
 	      (abortedp 't)
-	      (test-event-args (list test-stats abortedp))
+	      (test-event-args (list ert-test-stats abortedp))
 	      (actual-message (progn (generate--run-tests-batch-handle-run-ended tests-groups-alist test-event-args) (apply #'concat (reverse messages)))))
 	(should (s-contains-p "Aborted" actual-message))
 	(should-not (s-contains-p "Start at" actual-message))

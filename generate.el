@@ -532,7 +532,7 @@ If NUM-RUNS is not specified, your test will be defined 100 times.
 
 (defalias 'generate--passed-unexpected-message-printer (-partial #'generate--default-message-printer :passed-unexpected "passed unexpectedly" 'nil))
 
-(cl-defun generate--maybe-print-backtrace ((stats test result))
+(cl-defun generate--maybe-print-backtrace (stats test result)
   (unless (ert-test-result-expected-p test result)
     (cl-etypecase result
       (ert-test-passed
@@ -598,15 +598,25 @@ If NUM-RUNS is not specified, your test will be defined 100 times.
 	     (ert--format-time-iso8601 (ert--stats-start-time stats))
 	     selector)))
 
-(defun generate--run-tests-batch-handle-run-ended-base (summary-strings tests-groups-alist event-args)
+(cl-defun generate--run-tests-batch-handle-test-ended (tests-groups-alist (stats test result))
+  (generate--maybe-print-backtrace stats test result)
+  (-let* ((test-name (ert-test-name test))
+	 ((test-group-name) (generate--chop-test-name test))
+	 (test-absolute-index (map-elt (ert--stats-test-map stats) test-name))
+	 (test-start-time (seq-elt (ert--stats-test-start-times stats) test-absolute-index))
+	 (test-end-time (seq-elt (ert--stats-test-start-times stats) test-absolute-index))	 
+	 (expected-result (ert-test-expected-result-type test))
+	 (matches-expected-result (ert-test-result-expected-p test result))
+	 (test-result-key (generate--create-test-result-key expected-result matches-expected-result)))    
+    (cl-incf (generate--plist-get test-result-key (map-elt tests-groups-alist test-group-name)))
+    (cl-incf (generate--plist-get :completed-tests (map-elt tests-groups-alist test-group-name)))
+    (push result (generate--plist-get :test-results (map-elt tests-groups-alist test-group-name)))
+    (push test-start-time (generate--plist-get :test-start-times (map-elt tests-groups-alist test-group-name)))
+    (push test-end-time (generate--plist-get :test-end-times (map-elt tests-groups-alist test-group-name)))
+    (generate--maybe-print-final-group-stats (map-elt tests-groups-alist test-group-name) test-group-name)))
+
+(defun generate--run-tests-batch-handle-run-ended (tests-groups-alist event-args)
   (-let* (((stats abortedp) event-args)
-	  ((total-tests (total-passed-as-expected . passed-as-expected)
-			(total-failed-as-expected . failed-as-expected)
-			(total-skipped . skipped)
-			(total-failed-unexpected . failed-unexpected)
-			(total-passed-unexpected . passed-unexpected))
-	   (generate--create-final-tests-stats tests-groups-alist))
-	  (zipped-outcomes (-zip-pair summary-strings (list total-passed-as-expected total-failed-as-expected total-skipped total-failed-unexpected total-passed-unexpected)))
 	  (duration (generate--time-diff (ert--stats-end-time stats) (ert--stats-start-time stats)))
 	  (start-time (format-time-string "%T" (ert--stats-start-time stats)))
 	  (start-at-message (format "Start at  %s" start-time))
