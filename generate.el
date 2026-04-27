@@ -345,45 +345,45 @@ returned is equal to the length of LIST-ONE."
 
 ;;;###autoload
 (cl-defmacro generate-ert-deftest-n-times (name () &body docstring-keys-and-body)
-      "Define NAME (a symbol) as a `ert-deftest' n time where n = NUM-RUNS.
+  "Define NAME (a symbol) as a `ert-deftest' n time where n = NUM-RUNS.
 NUM-RUNS can be specified as a keyword argument in addition to
 the normal values of DOCSTRING-KEYS-AND-BODY.
 If NUM-RUNS is not specified, your test will be defined 100 times.
 
 \(fn NAME () [DOCSTRING] [:expected-result RESULT-TYPE] \
 [:tags \\='(TAG...)] [:num-runs INTEGERS] BODY...)"
-(declare (debug (&define [&name "test@" symbolp]
-			 sexp [&optional stringp]
-			 [&rest keywordp sexp]
-			 def-body))
+  (declare (debug (&define [&name "test@" symbolp]
+			   sexp [&optional stringp]
+			   [&rest keywordp sexp]
+			   def-body))
 	   (doc-string 3)
 	   (indent 2))
   (let ((documentation nil)
 	(documentation-supplied-p nil)
 	(run-symbol (gensym)))
-(when (stringp (car docstring-keys-and-body))
-  (setq documentation (pop docstring-keys-and-body)
-	documentation-supplied-p t))
-(cl-destructuring-bind
-    ((&key (expected-result nil expected-result-supplied-p)
-	   (tags nil tags-supplied-p)
-	 (num-runs 100))
-     body)
-    (ert--parse-keys-and-body docstring-keys-and-body)
-  `(cl-macrolet ((skip-when (form) `(ert--skip-when ,form))
-		 (skip-unless (form) `(ert--skip-unless ,form)))
-     (dotimes (run-symbol ,num-runs)
-       (ert-set-test (intern (format "%s-%s-%s" ',name generate--TEST-IDENTIFITER run-symbol))
-		   (make-ert-test
-		    :name (intern (format "%s-%s" ',name run-symbol))
-		    ,@(when documentation-supplied-p
-			`(:documentation ,documentation))
-		    ,@(when expected-result-supplied-p
-			`(:expected-result-type ,expected-result))
-		    ,@(when tags-supplied-p
-			`(:tags ,tags))
-		    :body (lambda () ,@body nil)
-		    :file-name ,(or (macroexp-file-name) buffer-file-name))))))))
+    (when (stringp (car docstring-keys-and-body))
+      (setq documentation (pop docstring-keys-and-body)
+	    documentation-supplied-p t))
+    (cl-destructuring-bind
+	((&key (expected-result nil expected-result-supplied-p)
+	       (tags nil tags-supplied-p)
+	       (num-runs 100))
+	 body)
+	(ert--parse-keys-and-body docstring-keys-and-body)
+      `(cl-macrolet ((skip-when (form) `(ert--skip-when ,form))
+		     (skip-unless (form) `(ert--skip-unless ,form)))
+	 (dotimes (run-symbol ,num-runs)
+	   (ert-set-test (intern (format "%s-%s-%s" ',name generate--TEST-IDENTIFIER run-symbol))
+			 (make-ert-test
+			  :name (intern (format "%s-%s" ',name run-symbol))
+			  ,@(when documentation-supplied-p
+			      `(:documentation ,documentation))
+			  ,@(when expected-result-supplied-p
+			      `(:expected-result-type ,expected-result))
+			  ,@(when tags-supplied-p
+			      `(:tags ,tags))
+			  :body (lambda () ,@body nil)
+			  :file-name ,(or (macroexp-file-name) buffer-file-name))))))))
 
 (defmacro generate--plural! (macro args)
   "Use ARGS to create a plural verson of MACRO."
@@ -404,6 +404,7 @@ If NUM-RUNS is not specified, your test will be defined 100 times.
 
 
 
+(defun generate--chop-test-name-helper (test-identifier)
   (lambda (test)
     (let* ((test-name (ert-test-name test))
 	   (name-end-index (s-index-of (format "-%s" test-identifier) test-name))
@@ -438,13 +439,15 @@ If NUM-RUNS is not specified, your test will be defined 100 times.
   (thunk-let* ((outcome-value (plist-get test-group-plist outcome #'equal))
 	       (other-outcomes (-remove (-partial #'equal outcome) list-of-outcomes))
 	       (other-outcome-values (mapcar (lambda (other-outcome) (plist-get test-group-plist other-outcome #'equal)) other-outcomes))
+	       
 	       (exclusive-check (if exclusive (seq-every-p (-partial #'equal 0) other-outcome-values) 't)))
     (and (g--gt0 outcome-value) exclusive-check)))
 
 
+;; just return length
 (defun generate--stats-default (list-of-outcomes outcome exclusive tests-groups-alist)
   (let ((result (map-filter (-partial #'generate--creates-stats-predicate list-of-outcomes outcome exclusive) tests-groups-alist)))
-    (list (length result) result)))
+    (cons outcome (length result))))
 
 (defalias 'generate--stats (-partial #'generate--stats-default generate--DEFAULT-OUTCOMES))
 
@@ -1084,16 +1087,6 @@ The length of each word corresponds to a value in WORD-LENGTHS."
       (first-word (list (seq-subseq string-of-characters 0 first-word-length)))
       (initial-value (list first-word first-word-length)))
   (funcall (-compose #'seq-first (-partial #'seq-reduce (-partial #'generate--n-words-reducer string-of-characters))) rest-of-list initial-value)))
-
-
-
-
-
-
-
-
-
-
 
 (defun generate-n-alpha-string-characters (character-count)
   "Returns a random list of alphabetic string characters whose length will be equal to CHARACTER-COUNT.
