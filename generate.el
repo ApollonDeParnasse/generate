@@ -392,6 +392,18 @@ If NUM-RUNS is not specified, your test will be defined 100 times.
 	     (symbol-value args))))
 
 (defun generate--chop-each-test-name-helper-base (test-identifier)
+(defun generate--get-ert-outcome-attribute (constant attribute)
+  (lambda (outcome)
+    (funcall (-compose (-partial #'generate--plist-get attribute) (-rpartial #'generate--plist-get constant)) outcome)))
+
+(defalias 'generate--get-ert-outcome-summary-message-function (generate--get-ert-outcome-attribute generate--DEFAULT-OUTCOMES-PLIST :summary-message))
+(defalias 'generate--get-ert-outcome-breakdown-message (generate--get-ert-outcome-attribute generate--DEFAULT-OUTCOMES-PLIST :breakdown-message))
+(defalias 'generate--get-ert-outcome-slot-func (generate--get-ert-outcome-attribute generate--DEFAULT-OUTCOMES-PLIST :slot))
+(defalias 'generate--get-expected-result-type (generate--get-ert-outcome-attribute generate--DEFAULT-OUTCOMES-PLIST :expected-result-type))
+(defalias 'generate--get-compatible-outcome (generate--get-ert-outcome-attribute generate--DEFAULT-OUTCOMES-PLIST :compatible))
+
+
+
   (lambda (test)
     (let* ((test-name (ert-test-name test))
 	   (name-end-index (s-index-of (format "-%s" test-identifier) test-name))
