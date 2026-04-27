@@ -1748,16 +1748,38 @@ Values are hexadecimals."
 	 (test-reasons (mapcar #'ert-reason-for-test-result test-results)))
     (list test-results test-reasons)))
 
-(defun generate-ert-test (test-name &optional documentation expected-result tags file-name)
+(cl-defun generate-ert-test (test-name &key documentation tags file-name expected-result-type)
   (let ((test-symbol (intern test-name))
-	(test-func-body (generate-random-boolean))
-	(test-file-name (generate-random-file-name)))
+	(test-func-body (generate-random-boolean)))
     (make-ert-test
      :name test-name
+     :documentation (or documentation (generate-random-sentence))
      :body (lambda () test-func-body)
-     :file-name test-file-name)))
+     :expected-result-type (or expected-result-type ':passed)
+     :file-name (or file-name (generate-random-file-name)))))
 
+(defun generate--generate-test-base (test-identifier)
+  (cl-function (lambda (test-name next-test-index-for-group &key documentation tags file-name expected-result-type)
+    (generate-ert-test (format "%s-%s-%s" test-name test-identifier next-test-index-for-group) :documentation documentation :tags tags :file-name file-name :expected-result-type expected-result-type))))
 
+(defalias 'generate--generate-test (generate--generate-test-base generate--TEST-IDENTIFIER))
+
+(cl-defun generate--test-name-unfolder-base (test-identifier (count . name))
+  (generate--times count (lambda (index) (format "%s-%s-%s" name test-identifier index))))
+
+(defalias 'generate--test-name-unfolder (-partial #'generate--test-name-unfolder-base generate--TEST-IDENTIFIER))
+
+(cl-defun generate--generate-test-unfolder (test-group-name total-tests expected-result-type)
+  (generate--times total-tests (lambda (index) (generate--generate-test test-group-name index :expected-result-type expected-result-type))))
+
+(defun generate--create-ert-tests-for-test-group (test-group-name test-stats)
+  (-let* (((&plist :total-tests :expected-result-type) test-stats)
+	  (tests (generate--generate-test-unfolder test-group-name total-tests expected-result-type)))
+    tests))
+
+(defalias 'generate--create-list-of-tests-for-tests-groups-alist (-compose (-partial #'-flatten-n 1) (-partial #'map-apply #'generate--create-ert-tests-for-test-group)))
+
+(defalias 'generate--create-vector-of-tests-for-tests-groups-alist (-compose #'generate--applify-vector #'generate--create-list-of-tests-for-tests-groups-alist))
 
 (defun generate--fake-fresh-test-group-con-base (stats)
   (lambda (counts name index)
