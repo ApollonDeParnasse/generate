@@ -1098,6 +1098,11 @@ Base implementation use generate-shuffle-list."
 \(fn FUNCTION FUNCTION FUNCTION MAP)"
    (funcall (-compose op (-juxt (-compose key-func #'map-keys) (-compose values-func #'map-values))) map))
 
+(defun generate--map-merge-with-plus-plist (list-of-plists)
+  (if (length= list-of-plists 1)
+      (car list-of-plists)
+    (apply (-partial #'map-merge-with 'plist #'+) list-of-plists)))
+
 (cl-defun generate-data (&key (item-transformer #'identity) (list-transformer #'generate-shuffle-list)
 				   min-length max-length exact-length)
     "Return a random list.
