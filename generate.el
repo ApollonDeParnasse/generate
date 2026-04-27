@@ -1628,17 +1628,25 @@ Values are hexadecimals."
 
 (defalias 'generate-random-list-of-backtrace-frames (generate-default-convert-n-gen-to-random #'generate-list-of-n-backtrace-frames))
 
-(cl-defun generate--test-name-unfolder-base (test-identifier (count . name))
-  (generate--times count (lambda (index) (format "%s-%s-%s" name test-identifier index))))
-
-(defalias 'generate--test-name-unfolder (-partial #'generate--test-name-unfolder-base generate--TEST-IDENTIFITER))
-
-(cl-defun generate--ert-test-unfolder-base (test-identifier (count . name))
-  (generate--times count (lambda (index) (generate-ert-test (format "%s-%s-%s" name test-identifier index)))))
-
-(defalias 'generate--ert-test-unfolder (-partial #'generate--ert-test-unfolder-base generate--TEST-IDENTIFITER))
-
 (defalias 'generate--random-ert-test-outcome (-partial #'generate-seq-take-random-value-from-seq generate--DEFAULT-OUTCOMES))
+
+(defalias 'generate--random-ert-expected-result-type (-partial #'generate-seq-take-random-value-from-seq generate--EXPECTED-RESULT-TYPES))
+
+(defun generate--random-x-type-ert-test-outcome-base (default-outcomes-plist)
+  (lambda (type expected-val)
+    (lambda ()
+      (let ((filtered-outcomes (map-filter (lambda (_ attributes) (equal (generate--plist-get type attributes) expected-val)) default-outcomes-plist)))
+	(generate-map-random-key filtered-outcomes)))))
+
+(defalias 'generate--random-x-type-ert-test-outcome (generate--random-x-type-ert-test-outcome-base generate--DEFAULT-OUTCOMES-PLIST))
+
+(defalias 'generate--random-exclusive-ert-test-outcome (generate--random-x-type-ert-test-outcome :exclusive 't))
+
+(defalias 'generate--random-non-exclusive-ert-test-outcome (generate--random-x-type-ert-test-outcome :exclusive 'nil))
+
+(defalias 'generate--random-expected-ert-test-outcome (generate--random-x-type-ert-test-outcome :expectedp 't))
+
+(defalias 'generate--random-unexpected-ert-test-outcome (generate--random-x-type-ert-test-outcome :expectedp 'nil))
 
 (defun generate--make-should-form-gen-for-type-x (pcase-randomizer)
   (lambda (passing assert-symbol random-val)
