@@ -188,6 +188,15 @@
 					  "webmanifest" "wsc" "x-php" "xaml" "xht" "xhtml" "xml" "xs" "xsd"
 					  "xsl" "xslt" "y" "yaml" "yml" "zsh" "zshrc"))
 
+(defgroup generate nil
+  "Random generators for testing"
+  :tag "generate")
+
+(defcustom generate-lisp-timestamp-range-size generate--SECONDS-IN-AN-HOUR
+  "The size of the range to be used functions which will generate random timestamps."
+  :group 'generate
+  :type 'natnum)
+
 (defalias 'generate--lt #'< "less-than alias in order to avoid issues with emacs-lisp syntax highlighting.")
 (defalias 'generate--lt1 #'< "less-than 1?")
 (defalias 'generate--lte #'<= "less-than-or-equal alias in order to avoid issues with emacs-lisp syntax highlighting.")
