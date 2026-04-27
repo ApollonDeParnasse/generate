@@ -1301,10 +1301,13 @@ Stolen from tramp."
 
 (defalias 'generate--lisp-timestamp-range-duration-helper (-juxt #'car #'cadr #'generate--get-lisp-timestamp-range-duration))
 
-(defun generate--timestamp-range-indices-to-timestamps (hz min range-indices)
-  (mapcar (lambda (i) (cons (+ (* i hz) min) hz)) range-indices))
+(defun generate--timestamp-range-index-to-timestamp (hz min index)
+  (cons (+ (* index hz) min) hz))
 
-(cl-defun generate--create-timestamp-range-around-current-time (inc-bottom inc-top)
+(defun generate--timestamp-range-indices-to-timestamps (hz min range-indices)
+  (mapcar (-partial #'generate--timestamp-range-index-to-timestamp hz min) range-indices))
+
+(cl-defun generate--create-timestamp-range-around-current-time (minus-bottom plus-top)
   "Uses `current-time' to create a timestamp.
 Returns a list that contains the MIN and MAX
 of the range along with the HZ value used for the
