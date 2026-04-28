@@ -2,7 +2,7 @@
 
 ;; Author: Earl Chase
 ;; Maintainer: Earl Chase
-;; Version: 0.0
+;; Version: 0.0.0
 ;; Keywords: testing
 ;; Package-Requires: ((emacs "30") (org "9.7") (dash "2.20.0") (s "1.13.1") (compat "29"))
 ;; Homepage: https://github.com/ApollonDeParnasse/generate
@@ -31,6 +31,9 @@
 ;;; Code:
 
 (require 'ert)
+(require 'eieio)
+(require 'cl-macs)
+(require 'seq)
 (require 'generate)
 (require 's)
 
@@ -183,9 +186,9 @@
     "foo"
     :tags '(bar)
     :num-runs 20
-    (should (equal 1 1)))  
+    (should (equal 1 1)))
   (generate--helper-for-self-tests-with-ert "generate-test-123" 20 '(bar) "foo")
-  (generate--times 80 (lambda (n)			
+  (generate--times 80 (lambda (n)
 			(let* ((expected-symbol (intern (format "%s-%s-symbol-%s" "generate-test-123" generate--TEST-IDENTIFIER (+ n 20)))))
 			  (should-not (ert-test-boundp expected-symbol))))))
 
@@ -313,7 +316,6 @@
 								:failed-expected (list 'ert-test-failed :failed)
 								:skipped (list 'ert-test-skipped :skipped))))
 	  (actual-ert-test-result (generate-ert-test-result-object test-outcome test-duration)))
-    (print actual-ert-test-result)
     (should (ert-test-result-type-p actual-ert-test-result expected-result-type))
     (should (stringp (ert-test-result-with-condition-messages actual-ert-test-result)))
     (should (equal (ert-test-result-with-condition-duration actual-ert-test-result) test-duration))
@@ -334,13 +336,9 @@
 	  (test-outcome-duration-pairs (-zip-lists generate--DEFAULT-OUTCOMES test-durations))
 	  (test-outcome-counts-plist (-interleave generate--DEFAULT-OUTCOMES test-outcome-counts))
 	  (test-plist-of-ert-test-result-objects (generate--plist-of-ert-test-result-objects test-outcome-duration-pairs))
-	  ((test-results test-reasons) (generate--take-from-plist-of-ert-test-results test-plist-of-ert-test-result-objects test-outcome-counts-plist))
-	  (expected-length (funcall (-compose #'-sum #'map-values) test-outcome-counts-plist))
-	  ((random-outcome random-pred) (generate-seq-take-random-value-from-seq generate--OUTCOME-PREDS-MAPPING))
-	  (expected-count-for-random-outcome (generate--plist-get random-outcome test-outcome-counts-plist)))
+	  (test-results (generate--take-from-plist-of-ert-test-results test-plist-of-ert-test-result-objects test-outcome-counts-plist))
+	  (expected-length (funcall (-compose #'-sum #'map-values) test-outcome-counts-plist)))
     (should (length= test-results expected-length))
-    (should (stringp (generate-seq-take-random-value-from-seq test-reasons)))
-    (should (length= test-reasons expected-length))))
     (should (ert-test-result-p (generate-seq-take-random-value-from-seq test-results)))))
 
 (generate-ert-deftest-n-times generate--generate-test-simple ()

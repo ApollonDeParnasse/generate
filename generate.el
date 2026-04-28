@@ -45,43 +45,43 @@
 (require 'dash)
 (require 's)
 
-(defconst generate--TEST-IDENTIFITER
+(defconst generate--TEST-IDENTIFIER
   "gen-ert")
 (defconst generate--DEFAULT-OUTCOMES
   (list :passed-expected :passed-unexpected :skipped :failed-unexpected :failed-expected))
-(defconst generate--DEFAULT-OUTCOMES-FOR-SELF-TESTS
+
+(defconst generate--EXPECTED-RESULT-TYPES
+  (list ':passed ':skipped ':failed))
+
+(defconst generate--DEFAULT-OUTCOMES-PLIST
   (list :passed-expected
-	(list :exclusive 't :with-reasons-and-results 'nil :message "passed as expected" :summary "Passed as expected" :slot #'ert--stats-passed-expected)
+	(list :exclusive 't :expectedp 't :expected-result-type ':passed :summary-message (cl-constantly "passed as expected") :breakdown-message "Passed as expected" :slot #'ert--stats-passed-expected :compatible ':failed-unexpected :test-outcome-sign "✓")
 	:passed-unexpected
-	(list :exclusive 'nil :with-reasons-and-results 'nil :message "passed unexpectedly" :summary "Passed unexpectedly" :slot #'ert--stats-passed-unexpected)
+	(list :exclusive 'nil :expectedp 'nil :expected-result-type ':failed :summary-message (cl-constantly "passed unexpectedly") :breakdown-message "Passed unexpectedly" :slot #'ert--stats-passed-unexpected :compatible ':failed-expected :test-outcome-sign "×")
 	:skipped
-	(list :exclusive 't :with-reasons-and-results 'nil :message "was skipped" :summary "Skipped" :slot #'ert--stats-skipped)
+	(list :exclusive 't :expectedp 't :expected-result-type ':skipped :summary-message (lambda (count) (if (> count 1) "were skipped" "was skipped")) :breakdown-message "Skipped" :slot #'ert--stats-skipped :compatible ':skipped :test-outcome-sign "↓")
 	:failed-expected
-	(list :exclusive 't :with-reasons-and-results 'nil :message "failed as expected" :summary "Failed as expected" :slot #'ert--stats-failed-expected)
+	(list :exclusive 't :expectedp 't :expected-result-type ':failed :summary-message (cl-constantly "failed as expected") :breakdown-message "Failed as expected" :slot #'ert--stats-failed-expected :compatible ':passed-unexpected :test-outcome-sign "✓")
 	:failed-unexpected
-	(list :exclusive 'nil :with-reasons-and-results 't :message "failed unexpectedly" :summary "Failed unexpectedly" :slot #'ert--stats-failed-unexpected)))
+	(list :exclusive 'nil :expectedp 'nil :expected-result-type ':passed :summary-message (cl-constantly "failed unexpectedly") :breakdown-message "Failed unexpectedly" :slot #'ert--stats-failed-unexpected :compatible ':passed-expected :test-outcome-sign "×")))
+
 (defconst generate--TEST-GROUPS-PLIST
   (list
    :total-tests 0
+   :completed-tests 0
    :passed-expected 0
    :passed-unexpected 0
    :failed-unexpected 0
    :skipped 0
    :failed-expected 0
    :failed-unexpected 0
-   :reasons nil
-   :results nil
+   :test-results nil
    :duration 0
    :test-start-times nil
-   :test-end-times nil))
-
-(defconst generate--TEST-OUTCOME-STRINGS
-  (list "passed as expected" "failed as expected" "were skipped" "failed unexpectedly" "passed unexpectedly"))
-
-
-(defconst generate--TEST-SUMMARY-STRINGS
-  (list "Passed as expected" "Failed as expected" "Skipped" "Failed unexpectedly" "Passed unexpectedly"))
-
+   :test-end-times nil
+   ;; for testing purposes only
+   ;; otherwise,this key is never referenced
+   :expected-result-type ':passed))
 
 (defconst generate--PREDICATES
   (list
@@ -219,6 +219,12 @@
 
 (defalias 'generate--compact (-partial #'seq-filter #'identity))
 
+(defmacro generate--plural! (macro args)
+  "Use ARGS to create a plural verson of MACRO."
+  `(progn
+     ,@(seq-map (lambda (p) `(,macro ,p))
+	     (symbol-value args))))
+
 (defun generate--plist-get (prop plist)
   (plist-get plist prop #'equal))
 
@@ -267,7 +273,6 @@
 
 
 (defalias 'generate--applify-mapcar  (-applify #'mapcar))
-(defalias 'generate--applify-cl-subsetp (-applify #'cl-subsetp))
 (defalias 'generate--applify-seq-split (-applify #'seq-split))
 (defalias 'generate--applify-seq-take (-applify #'seq-take))
 (defalias 'generate--applify-vector (-applify #'vector))
@@ -398,13 +403,6 @@ If NUM-RUNS is not specified, your test will be defined 100 times.
 			  :body (lambda () ,@body nil)
 			  :file-name ,(or (macroexp-file-name) buffer-file-name))))))))
 
-(defmacro generate--plural! (macro args)
-  "Use ARGS to create a plural verson of MACRO."
-  `(progn
-     ,@(seq-map (lambda (p) `(,macro ,p))
-	     (symbol-value args))))
-
-(defun generate--chop-each-test-name-helper-base (test-identifier)
 (defun generate--get-ert-outcome-attribute (constant attribute)
   (lambda (outcome)
     (funcall (-compose (-partial #'generate--plist-get attribute) (-rpartial #'generate--plist-get constant)) outcome)))
@@ -452,7 +450,7 @@ If NUM-RUNS is not specified, your test will be defined 100 times.
   (thunk-let* ((outcome-value (plist-get test-group-plist outcome #'equal))
 	       (other-outcomes (-remove (-partial #'equal outcome) list-of-outcomes))
 	       (other-outcome-values (mapcar (lambda (other-outcome) (plist-get test-group-plist other-outcome #'equal)) other-outcomes))
-	       
+
 	       (exclusive-check (if exclusive (seq-every-p (-partial #'equal 0) other-outcome-values) 't)))
     (and (g--gt0 outcome-value) exclusive-check)))
 
@@ -530,7 +528,7 @@ If NUM-RUNS is not specified, your test will be defined 100 times.
   (thunk-let* ((duration (plist-get test-stats :duration #'equal))
 	       (reasons (plist-get test-stats :reasons #'equal))
 	       (with-reasons (g--len-gt0 (getenv "EMACS_TEST_VERBOSE")))
-	       (results (mapcar (-compose #'backtrace-to-string #'ert-test-result-with-condition-backtrace) (plist-get test-stats :results #'equal)))
+	       (results (mapcar (-compose #'backtrace-to-string #'ert-test-result-with-condition-backtrace) (plist-get test-stats :test-results #'equal)))
 	       (reasons-results (-zip-pair results reasons)))
     (message "%s %s \n Duration: %s" test-name message duration)
     (cond
@@ -621,10 +619,10 @@ If NUM-RUNS is not specified, your test will be defined 100 times.
 	 ((test-group-name) (generate--chop-test-name test))
 	 (test-absolute-index (map-elt (ert--stats-test-map stats) test-name))
 	 (test-start-time (seq-elt (ert--stats-test-start-times stats) test-absolute-index))
-	 (test-end-time (seq-elt (ert--stats-test-start-times stats) test-absolute-index))	 
+	 (test-end-time (seq-elt (ert--stats-test-start-times stats) test-absolute-index))
 	 (expected-result (ert-test-expected-result-type test))
 	 (matches-expected-result (ert-test-result-expected-p test result))
-	 (test-result-key (generate--create-test-result-key expected-result matches-expected-result)))    
+	 (test-result-key (generate--create-test-result-key expected-result matches-expected-result)))
     (cl-incf (generate--plist-get test-result-key (map-elt tests-groups-alist test-group-name)))
     (cl-incf (generate--plist-get :completed-tests (map-elt tests-groups-alist test-group-name)))
     (push result (generate--plist-get :test-results (map-elt tests-groups-alist test-group-name)))
@@ -1160,7 +1158,7 @@ The function will called on each number in the random list.
 
 (defalias 'generate--seq-map-next-lower-alpha-character (-partial #'seq-map #'generate--get-next-lower-alpha-character) "Converts LIST into a list of lowercase alphabetic characters.")
 
-  (cl-defun generate--n-words-reducer (string-of-characters (words last-end) current-end)
+(cl-defun generate--n-words-reducer (string-of-characters (words last-end) current-end)
       "Helper function used by generate--n-words-helper.
 Takes of subseq from STRING-OF-CHARACTERS. The subseq will start at LAST-END and end at CURRENT-END.
 The subseq will be cons onto WORDS."
@@ -1168,8 +1166,8 @@ The subseq will be cons onto WORDS."
        (current-word (seq-subseq string-of-characters last-end current-word-end)))
     (list (cons current-word words) current-word-end)))
 
-(defun generate--n-words-helper (word-lengths string-of-characters)
-  "Helper function used by generate-n-words.
+(defun generate--list-of-n-words-helper (word-lengths string-of-characters)
+  "Helper function used by generate-list-of-n-words.
 Chops STRING-OF-CHARACTERS into a list of words.
 The length of each word corresponds to a value in WORD-LENGTHS."
   (-let* (((first-word-length rest-of-list) (funcall (-juxt #'car #'cdr) word-lengths))
@@ -1197,7 +1195,7 @@ The number of lines will be equal to WORD-COUNT.
 \(fn INTEGER)"
   (-let* (((word-lengths character-count) (funcall (-compose (-juxt #'identity #'-sum) #'generate-shuffle-list #'-iota) word-count (generate-random-nat-number-in-range (list 3 6))))
        (string-of-characters (generate-n-length-word character-count))
-       (words (generate--n-words-helper word-lengths string-of-characters)))
+       (words (generate--list-of-n-words-helper word-lengths string-of-characters)))
     (if (generate--len-gt words word-count) (butlast words) words)))
 
 (defalias 'generate-list-of-n-strings #'generate-list-of-n-words)
@@ -1258,7 +1256,6 @@ Each generator will be called a random number of times."
 (defalias 'generate-list-of-nat-number-strings (-partial #'generate-data :item-transformer #'number-to-string) "Returns a random list of strings where each string is a natural numbers. The length of the list can be optionally specified using :MIN-LENGTH and :MAX-LENGTH or simply :EXACT-LENGTH. \(fn [:max-length INTEGER] [:min-length INTEGER] [:exact-length INTEGER])")
 (defalias 'generate-list-of-floats-between-0-and-1 (-partial #'generate-data :list-transformer (-compose #'generate--divide-list-values-by-max-list-value #'generate-seq-shuffle)) "Returns a random list of floats where each float is greater than or equal to zero and less than 1. The length of the list can be optionally specified using :MIN-LENGTH and :MAX-LENGTH or simply :EXACT-LENGTH. \(fn [:max-length INTEGER] [:min-length INTEGER] [:exact-length INTEGER])")
 (defalias 'generate-list-of-floats (-partial #'generate-data :list-transformer (-compose #'generate--divide-list-values-by-random-value #'generate-seq-shuffle)) "Returns a random list of floats. The length of the list can be optionally specified using :MIN-LENGTH and :MAX-LENGTH or simply :EXACT-LENGTH. \(fn [:max-length INTEGER] [:min-length INTEGER] [:exact-length INTEGER])")
-;;(defalias 'generate-random-list-of-strings (-partial #'generate-data :min-length 20 :item-transformer #'generate--get-next-lower-alpha-character :list-transformer (-compose #'generate-seq-split-random #'seq--into-string)) "Returns a random list of strings.")
 (defalias 'generate-random-list-of-lists-nat-numbers (-partial #'generate-data :list-transformer #'generate-seq-split-random) "Returns a random list of lists of natural numbers.")
 
 (cl-defun generate-list-of-nat-numbers-in-range (range &key (list-transformer #'generate-shuffle-list) min-length max-length exact-length)
@@ -1275,7 +1272,7 @@ Each generator will be called a random number of times."
 (defconst generate--LIST-ITEM-TRANSFORMERS
   (list #'generate--get-next-lower-alpha-character
 	#'generate--get-next-upper-alpha-character
-	#'generate--nth-mod-file-extensions
+	#'generate-nth-mod-file-extensions
 	#'generate--divide-by-random-value
 	#'identity
 	#'number-to-string
@@ -1389,14 +1386,14 @@ or shrink the range of possible timestamps."
 
 (cl-defun generate-random-lisp-timestamp (&optional (range-size generate-lisp-timestamp-range-size))
   "Returns a random lisp timestamp.
-RANGE-SIZE should be seconds. 
+RANGE-SIZE should be seconds.
 It will be used to create the range of times from
 which the timestamp will be selected. Each timestamp will be in the (TICKS . HZ) format."
   (generate--lisp-timestamp-helper (floor range-size 2) (floor range-size 2)))
 
 (cl-defun generate-random-lisp-timestamp-range (&optional (range-size generate-lisp-timestamp-range-size))
   "Returns a random lisp timestamp range.
-RANGE-SIZE should be seconds. 
+RANGE-SIZE should be seconds.
 It will be used to create the range of times from
 which the timestamp will be selected. Each timestamp will be in the (TICKS . HZ) format."
   (generate--lisp-timestamp-range-helper (floor range-size 2) (floor range-size 2)))
@@ -1491,7 +1488,7 @@ If WITH-PADDING is true, the month will always be at least two characters, e.g. 
 
 (defalias 'generate-random-string-of-upper-alphanums (-partial #'generate--random-identifier-string #'generate--get-next-upper-alpha-string) "Create a random alphanumeric identifier string. All alphabetic characters will be in uppercase.")
 
-(defmacro generate-buffer-with-text (buffer-text &rest body)
+(defmacro generate-with-buffer-with-text (buffer-text &rest body)
  (declare (indent 1) (debug t))
  `(with-temp-buffer
    (insert ,buffer-text)
@@ -1573,7 +1570,7 @@ Execute BODY in buffer."
 
 (defalias 'generate-random-file-extension (-partial #'generate-seq-take-random-value-from-seq generate--FILE-EXTENSIONS) "Returns a random file extension.")
 
-(defalias 'generate--nth-mod-file-extensions (-rpartial #'generate--nth-mod generate--FILE-EXTENSIONS))
+(defalias 'generate-nth-mod-file-extensions (-rpartial #'generate-nth-mod generate--FILE-EXTENSIONS))
 
 
 
@@ -1982,7 +1979,7 @@ Values are hexadecimals."
 	      currently-executing-test-group
 	      currently-executing-test-group-name
 	      next-test-index-for-group
-	      completed-tests-count-for-group	    
+	      completed-tests-count-for-group
 	      total-tests-count-for-group
 	      absolute-total-tests-count
 	      absolute-outcomes-counts-plist)
@@ -2006,7 +2003,7 @@ Values are hexadecimals."
 			compatible-outcome count-for-compatible-outcome result-for-compatible-outcome
 			test-start-time test-end-time test-duration))
     (-let* ((to-merge-absolute (list (copy-sequence base-outcomes-counts-plist) (list requested-outcome count-for-requested-outcome) (list compatible-outcome count-for-compatible-outcome)))
-	    (absolute-outcomes-counts-plist (generate--map-merge-with-plus-plist to-merge-absolute))	    
+	    (absolute-outcomes-counts-plist (generate--map-merge-with-plus-plist to-merge-absolute))
 	    (absolute-total-tests (+ count-for-requested-outcome count-for-compatible-outcome))
 	    (duration (* absolute-total-tests test-duration))
 	    (requested-results (make-list count-for-requested-outcome result-for-requested-outcome))
