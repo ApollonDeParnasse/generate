@@ -339,6 +339,26 @@ returned is equal to the length of LIST-ONE."
 	(-zip-pair list-one list-two)
       (seq-map-indexed (generate--zip-pair-longest-helper (list 1 list-two)) list-one))))
 
+(defun generate--collect-keywords (keys-and-body collection)
+  (let ((first (car keys-and-body))
+	(second (cadr keys-and-body))
+	(rest (cddr keys-and-body)))
+    (cond
+     ((and (not first) (not second)) collection)
+     ((and (keywordp first) (not second)) (error "Value expected after keyword %S in %S"
+						 first keys-and-body))
+     ((and (keywordp first) second) (generate--collect-keywords rest (generate--plist-put first second collection)))
+     ((and first (not second)) (generate--plist-put :body first collection))
+     ((and first second) (error "Not sure what you did here %S"
+ 				keys-and-body)))))
+
+(defun generate--parse-keys-and-body (docstring-keys-and-body)
+  "Converts DOCSTRING-KEYS-AND-BODY into a plist."
+  (-let (((documentation keys-and-body) (if (stringp (car docstring-keys-and-body))
+					    (list (list :documentation (car docstring-keys-and-body)) (cdr docstring-keys-and-body))
+					  (list (list :documentation 'nil) docstring-keys-and-body))))
+    (generate--collect-keywords keys-and-body documentation)))
+
 ;;;###autoload
 (cl-defmacro generate-ert-deftest-n-times (name () &body docstring-keys-and-body)
   "Define NAME (a symbol) as a `ert-deftest' n time where n = NUM-RUNS.
@@ -354,24 +374,21 @@ If NUM-RUNS is not specified, your test will be defined 100 times.
 			   def-body))
 	   (doc-string 3)
 	   (indent 2))
-  (let ((documentation nil)
-	(documentation-supplied-p nil)
-	(run-symbol (gensym)))
-    (when (stringp (car docstring-keys-and-body))
-      (setq documentation (pop docstring-keys-and-body)
-	    documentation-supplied-p t))
+  (let ((run-symbol (gensym)))
     (cl-destructuring-bind
-	((&key (expected-result nil expected-result-supplied-p)
-	       (tags nil tags-supplied-p)
-	       (num-runs 100))
-	 body)
-	(ert--parse-keys-and-body docstring-keys-and-body)
+	(&key
+	 (documentation nil documentation-supplied-p)
+	 (expected-result nil expected-result-supplied-p)
+	 (tags nil tags-supplied-p)
+	 (num-runs 100)
+	 (body nil))
+	(generate--parse-keys-and-body docstring-keys-and-body)
       `(cl-macrolet ((skip-when (form) `(ert--skip-when ,form))
 		     (skip-unless (form) `(ert--skip-unless ,form)))
 	 (dotimes (run-symbol ,num-runs)
-	   (ert-set-test (intern (format "%s-%s-%s" ',name generate--TEST-IDENTIFIER run-symbol))
+	   (ert-set-test (intern (format "%s-%s-symbol-%s" ',name generate--TEST-IDENTIFIER run-symbol))
 			 (make-ert-test
-			  :name (intern (format "%s-%s" ',name run-symbol))
+			  :name (intern (format "%s-%s-test-%s" ',name generate--TEST-IDENTIFIER run-symbol))
 			  ,@(when documentation-supplied-p
 			      `(:documentation ,documentation))
 			  ,@(when expected-result-supplied-p

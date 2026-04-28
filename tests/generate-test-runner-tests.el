@@ -48,13 +48,158 @@
 	(list :passed-unexpected #'ert-test-passed-p)
 	(list :failed-unexpected #'ert-test-failed-p)))
 
-(defun generate--get-ert-outcome-attribute (attribute)
-  (lambda (outcome)
-    (funcall (-compose (-partial #'generate--plist-get attribute) (-rpartial #'generate--plist-get generate--DEFAULT-OUTCOMES-FOR-SELF-TESTS)) outcome)))
+(defconst generate--TEST-SUMMARY-STRINGS
+  (list "Passed as expected" "Failed as expected" "Skipped" "Failed unexpectedly" "Passed unexpectedly"))
 
-(defalias 'generate--get-ert-outcome-message (generate--get-ert-outcome-attribute :message))
-(defalias 'generate--get-ert-outcome-summary-message (generate--get-ert-outcome-attribute :summary))
-(defalias 'generate--get-ert-outcome-slot-func (generate--get-ert-outcome-attribute :slot))
+
+(defalias 'generate--TEST-SUMMARY-STRING-PREDICATES  (apply #'-orfn (mapcar (lambda (str) (-partial #'s-starts-with-p str)) generate--TEST-SUMMARY-STRINGS)))
+
+(generate-ert-deftest-n-times generate--parse-keys-and-body-body-only ()
+  :num-runs 0
+  (let* ((test-body (generate-random-should))
+	 (test-docstring-keys-and-body (list test-body)))
+    (cl-destructuring-bind
+	(&key
+	  (documentation nil documentation-supplied-p)
+	  (expected-result nil expected-result-supplied-p)
+	  (tags nil tags-supplied-p)
+	  (num-runs 100)
+	  (body nil))
+	 (generate--parse-keys-and-body test-docstring-keys-and-body)
+	 (should-not documentation)
+	 (should-not expected-result)
+	 (should-not tags)
+	 (should (equal num-runs 100))
+	 (should (equal body test-body)))))
+
+(generate-ert-deftest-n-times generate--parse-keys-and-body-documentation-and-body ()
+  :num-runs 0
+  (let* ((test-body (generate-random-should))
+	 (test-documentation (generate-random-string))
+	 (test-docstring-keys-and-body (list test-documentation test-body)))
+    (cl-destructuring-bind
+	(&key
+	  (documentation nil documentation-supplied-p)
+	  (expected-result nil expected-result-supplied-p)
+	  (tags nil tags-supplied-p)
+	  (num-runs 100)
+	  (body nil))
+	 (generate--parse-keys-and-body test-docstring-keys-and-body)
+	 (should (equal documentation test-documentation))
+	 (should-not expected-result)
+	 (should-not tags)
+	 (should (equal num-runs 100))
+	 (should (equal body test-body)))))
+
+(generate-ert-deftest-n-times generate--parse-keys-and-body-num-runs-and-body ()
+  :num-runs 0
+  (let* ((test-body (generate-random-should))
+	 (test-num-runs (generate-random-nat-number))
+	 (test-docstring-keys-and-body (list :num-runs test-num-runs test-body)))
+    (cl-destructuring-bind
+	(&key
+	  (documentation nil documentation-supplied-p)
+	  (expected-result nil expected-result-supplied-p)
+	  (tags nil tags-supplied-p)
+	  (num-runs 100)
+	  (body nil))
+	 (generate--parse-keys-and-body test-docstring-keys-and-body)
+	 (should-not documentation)
+	 (should-not expected-result)
+	 (should-not tags)
+	 (should (equal num-runs test-num-runs))
+	 (should (equal body test-body)))))
+
+(generate-ert-deftest-n-times generate--parse-keys-and-body-keywords-mutiple-keyword-args-plus-body ()
+  :num-runs 0
+  (let* ((test-body (generate-random-should))
+	 (test-num-runs (generate-random-nat-number))
+	 (test-expected-result-type (generate--random-ert-expected-result-type))
+	 (test-tags (generate-random-list-of-symbols))
+	 (test-docstring-keys-and-body (list :num-runs test-num-runs :expected-result test-expected-result-type :tags test-tags test-body)))
+	 (cl-destructuring-bind
+	     (&key
+	       (documentation nil documentation-supplied-p)
+	       (expected-result nil expected-result-supplied-p)
+	       (tags nil tags-supplied-p)
+	       (num-runs 100)
+	       (body nil))
+	     (generate--parse-keys-and-body test-docstring-keys-and-body)
+	   (should-not documentation)
+	   (should (equal expected-result test-expected-result-type))
+	   (should (equal tags test-tags))
+	   (should (equal num-runs test-num-runs))
+	   (should (equal body test-body)))))
+
+(generate-ert-deftest-n-times generate--parse-keys-and-body-kitchen-sink ()
+  :num-runs 0
+  (let* ((test-body (generate-random-should))
+	 (test-num-runs (generate-random-nat-number))
+	 (test-expected-result-type (generate--random-ert-expected-result-type))
+	 (test-tags (generate-random-list-of-symbols))
+	 (test-documentation (generate-random-string))
+	 (test-docstring-keys-and-body (list test-documentation :num-runs test-num-runs :expected-result test-expected-result-type :tags test-tags test-body)))
+    (cl-destructuring-bind
+	(&key
+	 (documentation nil documentation-supplied-p)
+	 (expected-result nil expected-result-supplied-p)
+	 (tags nil tags-supplied-p)
+	 (num-runs 100)
+	 (body nil))
+	(generate--parse-keys-and-body test-docstring-keys-and-body)
+      (should (equal documentation test-documentation))
+      (should (equal expected-result test-expected-result-type))
+      (should (equal tags test-tags))
+      (should (equal num-runs test-num-runs))
+      (should (equal body test-body)))))
+
+(cl-defun generate--helper-for-self-tests-with-ert-times-func-creator (test-name tags documentation &optional expected-result)
+  (if expected-result
+      (lambda (n)
+	(let* ((expected-symbol (intern (format "%s-%s-symbol-%s" test-name generate--TEST-IDENTIFIER n)))
+	       (actual-test (ert-get-test expected-symbol)))
+	  (should (equal (ert-test-tags actual-test) tags))
+	  (should (equal (ert-test-documentation actual-test) documentation))
+	  (should (equal (ert-test-expected-result-type actual-test) expected-result))))
+    (lambda (n)
+      (let* ((expected-symbol (intern (format "%s-%s-symbol-%s" test-name generate--TEST-IDENTIFIER n)))
+	     (actual-test (ert-get-test expected-symbol)))
+	(should (equal (ert-test-tags actual-test) tags))
+	(should (equal (ert-test-documentation actual-test) documentation))))))
+
+
+(cl-defun generate--helper-for-self-tests-with-ert (test-name runs tags documentation &optional expected-result)
+  (generate--times runs (generate--helper-for-self-tests-with-ert-times-func-creator test-name tags documentation expected-result)))
+
+(ert-deftest generate-ert-deftest-n-times-simple ()
+  (generate-ert-deftest-n-times generate-test-abc ()
+    "foo"
+    :tags '(bar)
+    (should (equal 1 1)))
+  (generate--helper-for-self-tests-with-ert "generate-test-abc" 100 '(bar) "foo"))
+
+(ert-deftest generate-ert-deftest-n-times-with-numruns ()
+  (generate-ert-deftest-n-times generate-test-123 ()
+    "foo"
+    :tags '(bar)
+    :num-runs 20
+    (should (equal 1 1)))  
+  (generate--helper-for-self-tests-with-ert "generate-test-123" 20 '(bar) "foo")
+  (generate--times 80 (lambda (n)			
+			(let* ((expected-symbol (intern (format "%s-%s-symbol-%s" "generate-test-123" generate--TEST-IDENTIFIER (+ n 20)))))
+			  (should-not (ert-test-boundp expected-symbol))))))
+
+(ert-deftest generate-ert-deftest-n-times-with-numruns-and-expected-result ()
+  (generate-ert-deftest-n-times generate-test-456 ()
+    "foo"
+    :tags '(bar)
+    :num-runs 30
+    :expected-result ':failed
+    (should (equal 1 1)))
+  (generate--helper-for-self-tests-with-ert "generate-test-456" 30 '(bar) "foo" ':failed)
+  (generate--times 70 (lambda (n)
+			(let* ((expected-symbol (intern (format "%s-%s-symbol-%s" "generate-test-456" generate--TEST-IDENTIFIER (+ n 30)))))
+			  (should-not (ert-test-boundp expected-symbol))))))
 
 (generate-ert-deftest-n-times generate-ert-test ()
   :num-runs 0
