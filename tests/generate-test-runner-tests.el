@@ -997,17 +997,7 @@
 	(should-not (s-contains-p "Total tests" actual-message))
 	(should-not (s-contains-p "Breakdown:" actual-message))))))
 
-(generate-ert-deftest-n-times generate--create-run-tests-batch-listener ()
-  :num-runs 0
-  (let ((messages))
-    (cl-letf (((symbol-function 'message) (lambda (format-strings &rest args)
-					    (push (apply #'format format-string args) messages))))
-      (let* (((test-list-of-events expected-messages) (generate--random-list-of-ert-events))
-	     (actual-listener (generate--create-run-tests-batch-listener 't tests-groups-alist))
-	     (actual-messages (progn (mapc (-lambda ((event event-args)) (funcall actual-listener event event-args)) test-list-of-event) (s-join "\n" (reverse messages)))))
-	(mapc (lambda (expected-message) (should (s-contains-p expected-message actual-messages))) expected-messages)))))
 
-;;; generate-test-runner-tests.el ends here
 
 ;; Local Variables:
 ;; read-symbol-shorthands: (("g-" . "generate-"))

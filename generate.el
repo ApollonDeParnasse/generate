@@ -626,9 +626,31 @@ If NUM-RUNS is not specified, your test will be defined 100 times.
 	  (initial-message (s-join "\n" (list start-at-message duration-message total-tests-message breakdown-message))))
     (if abortedp
 	(message "Aborted")
-      (message "%s" (generate--summary-message initial-message zipped-outcomes)))))
+      (generate--print-test-run-stats initial-message tests-groups-alist))))
 
-(defalias 'generate--run-tests-batch-handle-run-ended (-partial #'generate--run-tests-batch-handle-run-ended-base generate--TEST-SUMMARY-STRINGS))
+(defun generate--create-run-tests-batch-listener (selector tests-groups-alist)
+  (lambda (event-type &rest event-args)
+    (pcase-exhaustive event-type
+      ('run-started (generate--run-tests-batch-handle-run-started selector tests-groups-alist event-args))
+      ('run-ended (generate--run-tests-batch-handle-run-ended tests-groups-alist event-args))
+      ('test-started)
+      ('test-ended (generate--run-tests-batch-handle-test-ended tests-groups-alist event-args)))))
+
+;;;###autoload
+(defun generate-run-tests-batch (&optional selector)
+  (let* ((tests (ert-select-tests selector t))
+	 (tests-groups-alist (generate--create-tests-groups-alist tests))
+	 (listener (generate--create-run-tests-batch-listener selector tests-groups-alist)))
+    (ert-run-tests selector listener)))
+
+;;;###autoload
+(cl-defun generate-run-tests-batch-and-exit (&optional (selector t))
+  (let ((tests (ert-select-tests selector t)))
+    (cl-letf (((symbol-function 'ert-run-tests-batch)
+	       (symbol-function 'generate-run-tests-batch))
+	      ((symbol-function 'ert-select-tests)
+	       (lambda (&rest _) tests)))
+      (ert-run-tests-batch-and-exit selector))))
 
 (defalias 'generate--cons-vec (-partial #'cons 'vec) "Convert a list into a calc vector.")
 
