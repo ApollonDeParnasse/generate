@@ -330,16 +330,16 @@ If NUM-RUNS is not specified, your test will be defined 100 times.
       `(cl-macrolet ((skip-when (form) `(ert--skip-when ,form))
 		     (skip-unless (form) `(ert--skip-unless ,form)))
 	 (dotimes (run-symbol ,num-runs)
-	   (ert-set-test (intern (format "%s-%s-symbol-%s" ',name generate--TEST-IDENTIFIER run-symbol))
+	   (ert-set-test (intern (format "%s-%s-%s" ',name generate--TEST-IDENTIFIER run-symbol))
 			 (make-ert-test
-			  :name (intern (format "%s-%s-test-%s" ',name generate--TEST-IDENTIFIER run-symbol))
+			  :name (intern (format "%s-%s-%s" ',name generate--TEST-IDENTIFIER run-symbol))
 			  ,@(when documentation-supplied-p
 			      `(:documentation ,documentation))
 			  ,@(when expected-result-supplied-p
 			      `(:expected-result-type ,expected-result))
 			  ,@(when tags-supplied-p
 			      `(:tags ,tags))
-			  :body (lambda () ,@body nil)
+			  :body (lambda () ,body nil)
 			  :file-name ,(or (macroexp-file-name) buffer-file-name))))))))
 
 (defun generate--get-ert-outcome-attribute (constant attribute)
@@ -354,17 +354,21 @@ If NUM-RUNS is not specified, your test will be defined 100 times.
 
 
 
-(defun generate--chop-test-name-helper (test-identifier)
+(defun generate--get-group-name-and-index-for-test-base (test-identifier)
+  "Converts TEST-IDENTIFIER into the symbol of the corresponding test group."
   (lambda (test)
-    (let* ((test-name (ert-test-name test))
-	   (name-end-index (s-index-of (format "-%s" test-identifier) test-name))
+    (let* ((test-name (symbol-name (ert-test-name test)))
+	   (name-end-index (1- (s-index-of test-identifier test-name)))
 	   (test-number-start-index (+ name-end-index (length test-identifier) 2))
 	   (name (substring test-name 0 name-end-index))
 	   (test-number (substring test-name test-number-start-index)))
       (cons name (string-to-number test-number)))))
 
-(defalias 'generate--chop-test-name (generate--chop-test-name-helper generate--TEST-IDENTIFIER))
-(defalias 'generate--chop-each-test-name (-partial #'mapcar #'generate--chop-test-name))
+(defalias 'generate--get-group-name-and-index-for-test (generate--get-group-name-and-index-for-test-base generate--TEST-IDENTIFIER)
+  "Default implementation of generate--get-group-name-and-index-for-test.")
+
+(defalias 'generate--get-group-name-and-index-for-each-test (-partial #'mapcar #'generate--get-group-name-and-index-for-test)
+  "Converts of a list of TEST-IDENTIFIERS into a list of test group symbols.")
 
 (cl-defun generate--get-name-count-cons-for-list-of-tests-helper ((name . vals))
   (let* ((counts (mapcar #'cdr vals)))
@@ -534,15 +538,17 @@ If NUM-RUNS is not specified, your test will be defined 100 times.
 (cl-defun generate--run-tests-batch-handle-test-ended (tests-groups-alist (stats test result))
   (generate--maybe-print-backtrace stats test result)
   (-let* ((test-name (ert-test-name test))
-	 ((test-group-name) (generate--chop-test-name test))
+	 ((test-group-name) (generate--get-group-name-and-index-for-test test))
 	 (test-absolute-index (map-elt (ert--stats-test-map stats) test-name))
 	 (test-start-time (seq-elt (ert--stats-test-start-times stats) test-absolute-index))
-	 (test-end-time (seq-elt (ert--stats-test-start-times stats) test-absolute-index))
+	 (test-end-time (seq-elt (ert--stats-test-end-times stats) test-absolute-index))
+	 (test-duration (ert-test-result-duration result))
 	 (expected-result (ert-test-expected-result-type test))
 	 (matches-expected-result (ert-test-result-expected-p test result))
 	 (test-result-key (generate--create-test-result-key expected-result matches-expected-result)))
     (cl-incf (generate--plist-get test-result-key (map-elt tests-groups-alist test-group-name)))
     (cl-incf (generate--plist-get :completed-tests (map-elt tests-groups-alist test-group-name)))
+    (cl-incf (generate--plist-get :duration (map-elt tests-groups-alist test-group-name)) test-duration)
     (push result (generate--plist-get :test-results (map-elt tests-groups-alist test-group-name)))
     (push test-start-time (generate--plist-get :test-start-times (map-elt tests-groups-alist test-group-name)))
     (push test-end-time (generate--plist-get :test-end-times (map-elt tests-groups-alist test-group-name)))
