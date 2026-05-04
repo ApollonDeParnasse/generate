@@ -10,7 +10,7 @@ test-primitives:
 	$(EMACS) --batch -L . \
 		 $(LOAD_PATH) \
 		 -l generate-primitives-tests.el \
-		 --eval "(ert-run-tests-batch-and-exit)";
+		 --eval "(generate-run-tests-batch-and-exit)";
 
 test-runner: ## Run test-runner tests
 test-runner: 
