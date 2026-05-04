@@ -73,7 +73,6 @@
    :completed-tests 0
    :passed-expected 0
    :passed-unexpected 0
-   :failed-unexpected 0
    :skipped 0
    :failed-expected 0
    :failed-unexpected 0

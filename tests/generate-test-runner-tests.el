@@ -343,7 +343,7 @@
 	 (should (equal body test-body)))))
 
 (generate-ert-deftest-n-times generate--parse-keys-and-body-documentation-and-body ()
-  :num-runs 0
+  :num-runs 100
   (let* ((test-body (generate-random-should))
 	 (test-documentation (generate-random-string))
 	 (test-docstring-keys-and-body (list test-documentation test-body)))
@@ -362,7 +362,7 @@
 	 (should (equal body test-body)))))
 
 (generate-ert-deftest-n-times generate--parse-keys-and-body-num-runs-and-body ()
-  :num-runs 0
+  :num-runs 100
   (let* ((test-body (generate-random-should))
 	 (test-num-runs (generate-random-nat-number))
 	 (test-docstring-keys-and-body (list :num-runs test-num-runs test-body)))
@@ -381,7 +381,7 @@
 	 (should (equal body test-body)))))
 
 (generate-ert-deftest-n-times generate--parse-keys-and-body-keywords-mutiple-keyword-args-plus-body ()
-  :num-runs 0
+  :num-runs 100
   (let* ((test-body (generate-random-should))
 	 (test-num-runs (generate-random-nat-number))
 	 (test-expected-result-type (generate--random-ert-expected-result-type))
@@ -402,7 +402,7 @@
 	   (should (equal body test-body)))))
 
 (generate-ert-deftest-n-times generate--parse-keys-and-body-kitchen-sink ()
-  :num-runs 0
+  :num-runs 100
   (let* ((test-body (generate-random-should))
 	 (test-num-runs (generate-random-nat-number))
 	 (test-expected-result-type (generate--random-ert-expected-result-type))
@@ -593,7 +593,7 @@
     (should (ert-test-p actual-random-ert-test))))
 
 (generate-ert-deftest-n-times generate--fake-fresh-tests-groups-alist-and-stats ()
-  :num-runs 0
+  :num-runs 100
   (-let* (((actual-tests-groups-alist actual-ert-stats actual-total-relative-tests-count actual-total-absolute-tests-count actual-group-names) (generate--fake-fresh-tests-groups-alist-and-stats))
 	  ((actual-group-name . actual-group-stats) (generate-seq-take-random-value-from-seq actual-tests-groups-alist)))
     (should (stringp actual-group-name))
@@ -604,7 +604,7 @@
     (should (g--len-gt0 actual-group-names))))
 
 (generate-ert-deftest-n-times generate--fake-mid-run-tests-groups-con-for-x-type-more-than-one-test-left ()
-  :num-runs 0
+  :num-runs 100
   (-let* ((test-outcome (generate--random-ert-test-outcome))
 	  (((_ . actual-group-stats) actual-ert-test-name actual-next-test-index-for-group actual-completed-tests-count-for-group
 			   actual-total-tests-count-for-group actual-absolute-outcomes-counts-plist)
@@ -627,7 +627,7 @@
     (should (plistp actual-absolute-outcomes-counts-plist))))
 
 (generate-ert-deftest-n-times generate--fake-mid-run-tests-groups-con-for-x-type-one-more-test-left ()
-  :num-runs 0
+  :num-runs 100
   (-let* ((test-outcome (generate--random-ert-test-outcome))
 	  (((_ . actual-group-stats) actual-ert-test-name actual-next-test-index-for-group actual-completed-tests-count-for-group
 			   actual-total-tests-count-for-group actual-absolute-outcomes-counts-plist)
@@ -650,7 +650,7 @@
     (should (plistp actual-absolute-outcomes-counts-plist))))
 
 (generate-ert-deftest-n-times generate--fake-mid-run-tests-groups-alist-for-x-type-more-than-one-test-left ()
-  :num-runs 0
+  :num-runs 100
   (-let* ((test-outcome (generate--random-ert-test-outcome))
 	  ((actual-tests-groups-alist
 	    actual-fresh-tests-groups-alist
@@ -683,7 +683,7 @@
     (should (consp actual-fresh-tests-groups-alist))))
 
 (generate-ert-deftest-n-times generate--fake-mid-run-tests-groups-alist-for-x-type-one-more-test-left ()
-  :num-runs 0
+  :num-runs 100
   (-let* ((test-outcome (generate--random-ert-test-outcome))
 	  ((actual-tests-groups-alist
 	    actual-fresh-tests-groups-alist
@@ -716,7 +716,7 @@
     (should (consp actual-fresh-tests-groups-alist))))
 
 (generate-ert-deftest-n-times generate--fake-mid-run-ert-stats-for-tests-groups-alist-with-more-than-one-test-left ()
-  :num-runs 0
+  :num-runs 100
   (-let* ((test-outcome (generate--random-ert-test-outcome))
 	  ((full-tests-groups-alist
 	    fresh-tests-groups-alist
@@ -897,7 +897,7 @@
     (should (g--gt0 actual-absolute-total-tests))))
 
 (generate-ert-deftest-n-times generate--fake-completed-test-group-con-for-outcome-x-for-exclusive-outcomes ()
-  :num-runs 0
+  :num-runs 100
   (-let*  ((test-group-name (generate-random-string))
 	   (test-requested-outcome (generate--random-exclusive-ert-test-outcome))
 	   (test-count-for-requested-outcome (generate--random-nat-number-in-range-10))
@@ -944,7 +944,7 @@
     (should (g--gt0 actual-absolute-total-tests))))
 
 (generate-ert-deftest-n-times generate--random-fake-completed-test-group-con-for-outcome-x ()
-  :num-runs 0
+  :num-runs 100
   (-let* ((test-requested-outcome (generate--random-ert-test-outcome))
 	  (((actual-group-name . actual-stats) actual-group-name actual-absolute-total-tests actual-outcomes-counts-plist) (generate--random-fake-completed-test-group-con-for-outcome-x test-requested-outcome))
     	  ((&plist
@@ -966,7 +966,7 @@
     (should (mapp actual-outcomes-counts-plist))))
 
 (generate-ert-deftest-n-times generate--fake-completed-tests-groups-alist ()
-  :num-runs 0
+  :num-runs 100
   (-let* ((expected-outcome (generate--random-ert-test-outcome))
 	  ((actual-tests-groups-alist actual-group-names-for-requested-outcome actual-other-group-names actual-absolute-total-tests-count actual-absolute-outcomes-counts-plist actual-relative-outcomes-counts-plist) (generate--fake-completed-tests-groups-alist expected-outcome))
 	  (actual-random-group-name (generate-seq-take-random-value-from-seq actual-group-names-for-requested-outcome))
@@ -991,7 +991,7 @@
     (should (natnump (generate-map-random-value actual-relative-outcomes-counts-plist)))))
 
 (generate-ert-deftest-n-times generate--random-fake-completed-tests-groups-alist ()
-  :num-runs 0
+  :num-runs 100
   (-let* (((actual-tests-groups-alist actual-group-names-for-requested-outcome actual-other-group-names actual-absolute-total-tests-count actual-absolute-outcomes-counts-plist) (generate--random-fake-completed-tests-groups-alist))
 	  ((actual-random-outcome actual-random-outcome-count) (generate-map-random-pair actual-absolute-outcomes-counts-plist))
 	  (actual-random-group-name (generate-seq-take-random-value-from-seq actual-group-names-for-requested-outcome))
@@ -1004,7 +1004,7 @@
     (should (plistp actual-absolute-outcomes-counts-plist))))
 
 (generate-ert-deftest-n-times generate--create-completed-ert-stats-for-tests-groups-alist ()
-  :num-runs 0
+  :num-runs 100
   (-let* ((test-outcome (generate--random-ert-test-outcome))
 	  ((tests-groups-alist test-group-names-for-requested-outcome test-other-group-names test-absolute-total-tests-count _)
 	   (generate--fake-completed-tests-groups-alist test-outcome))
@@ -1033,7 +1033,7 @@
     (should (decode-time (ert--stats-end-time actual-ert-stats)))))
 
 (generate-ert-deftest-n-times generate--fake-completed-tests-groups-alist-and-stats ()
-  :num-runs 0
+  :num-runs 100
   (-let* (((test-outcome random-other-outcome) (generate-seq-two-random-values generate--DEFAULT-OUTCOMES))
 	  (test-outcome-slot-func (generate--get-ert-outcome-slot-func test-outcome))
 	  ((actual-tests-groups-alist actual-ert-stats actual-group-names-for-requested-outcome actual-other-group-names actual-absolute-total-tests-count actual-absolute-outcomes-counts-plist actual-relative-outcomes-counts-plist)
@@ -1050,7 +1050,7 @@
     (should (mapc (lambda (x) (g--len-gt0 x)) (list actual-group-names-for-requested-outcome actual-other-group-names actual-absolute-outcomes-counts-plist actual-relative-outcomes-counts-plist)))))
 
 (generate-ert-deftest-n-times generate--random-fake-completed-tests-groups-alist-and-stats ()
-  :num-runs 0
+  :num-runs 100
   (-let* (((actual-tests-groups-alist actual-ert-stats actual-group-names-for-requested-outcome actual-other-group-names actual-absolute-total-tests-count actual-absolute-outcomes-counts-plist actual-relative-outcomes-counts-plist)
 	   (generate--random-fake-completed-tests-groups-alist-and-stats))
 	  ((actual-random-outcome actual-random-outcome-count) (generate-map-random-pair actual-absolute-outcomes-counts-plist))
@@ -1115,7 +1115,7 @@
     (should (equal actual-outcome-count expected-outcome-count))))
 
 (generate-ert-deftest-n-times generate--print-final-test-group-stats-for-expected-outcomes ()
-  :num-runs 0
+  :num-runs 100
   (let ((messages))
     (cl-letf (((symbol-function 'message) (lambda (format-string &rest args)
 					    (push (apply #'format format-string args) messages))))
@@ -1132,7 +1132,7 @@
 	(should (s-contains-p (number-to-string duration) actual-message))))))
 
 (generate-ert-deftest-n-times generate--print-final-test-group-stats-for-unexpected-outcomes ()
-  :num-runs 0
+  :num-runs 100
   (let ((messages))
     (cl-letf (((symbol-function 'message) (lambda (format-string &rest args)
 					    (push (apply #'format format-string args) messages))))
@@ -1151,7 +1151,7 @@
 	(should (s-contains-p (number-to-string duration) actual-message))))))
 
 (generate-ert-deftest-n-times generate--maybe-print-final-group-stats-should-not-print-anything ()
-  :num-runs 0
+  :num-runs 100
   (let ((messages))
     (cl-letf (((symbol-function 'message) (lambda (format-string &rest args)
 					    (push (apply #'format format-string args) messages))))
@@ -1162,7 +1162,7 @@
 	(should (string-equal actual-message ""))))))
 
 (generate-ert-deftest-n-times generate--maybe-print-final-group-stats-should-print-something ()
-  :num-runs 0
+  :num-runs 100
   (let ((messages))
     (cl-letf (((symbol-function 'message) (lambda (format-string &rest args)
 					    (push (apply #'format format-string args) messages))))
@@ -1173,7 +1173,7 @@
 	(should (g--len-gt0 actual-message))))))
 
 (generate-ert-deftest-n-times generate--run-tests-batch-handle-run-started ()
-  :num-runs 0
+  :num-runs 100
   (let ((messages))
     (cl-letf (((symbol-function 'message) (lambda (format-string &rest args)
 					    (push (apply #'format format-string args) messages))))
@@ -1181,11 +1181,10 @@
 	     ((tests-groups-alist ert-test-stats expected-total-test-count _) (generate--fake-fresh-tests-groups-alist-and-stats))
 	     (test-event-args (list ert-test-stats))
 	     (actual-message (progn (generate--run-tests-batch-handle-run-started test-selector tests-groups-alist test-event-args) (apply #'concat (reverse messages)))))
-	(print actual-message)
 	(should (s-contains-p (format "Running %s tests" expected-total-test-count) actual-message))))))
 
 (generate-ert-deftest-n-times generate--run-tests-batch-handle-test-ended-expected-no-message ()
-  :num-runs 0
+  :num-runs 100
   (let ((messages))
     (cl-letf (((symbol-function 'message) (lambda (format-string &rest args)
 					    (push (apply #'format format-string args) messages))))
@@ -1196,10 +1195,11 @@
 				   completed-tests-count-for-group total-tests-count-for-group
 				   absolute-outcomes-counts-plist)
 	       (generate--fake-mid-run-data-for-group-with-more-than-one-test-left test-outcome))
-	      ((&plist :test-start-times previous-start-times :test-end-times previous-end-times) (map-elt tests-groups-alist currently-executing-test-group-name))
+	      ((&plist :test-start-times previous-start-times :test-end-times previous-end-times :duration previous-duration) (map-elt tests-groups-alist currently-executing-test-group-name))
 	      (test-event-args (list ert-stats ert-test ert-test-result))
 	      (message (progn (generate--run-tests-batch-handle-test-ended tests-groups-alist test-event-args) messages))
-	      ((&plist :completed-tests :test-results :test-start-times :test-end-times) (map-elt tests-groups-alist currently-executing-test-group-name)))
+	      ((&plist :completed-tests :test-results :test-start-times :test-end-times :duration) (map-elt tests-groups-alist currently-executing-test-group-name)))
+	(should (> duration previous-duration))
 	(should (equal completed-tests (1+ completed-tests-count-for-group)))
 	(should (member ert-test-result test-results))
 	(should (length= test-start-times (1+ (length previous-start-times))))
@@ -1207,7 +1207,7 @@
 	(should-not message)))))
 
 (generate-ert-deftest-n-times generate--run-tests-batch-handle-test-ended-fail-unexpected ()
-  :num-runs 0
+  :num-runs 100
   (let ((messages))
     (cl-letf (((symbol-function 'message) (lambda (format-string &rest args)
 					    (push (apply #'format format-string args) messages))))
@@ -1250,7 +1250,7 @@
 	(should (s-contains-p expected-outcome-string message))))))
 
 (generate-ert-deftest-n-times generate--run-tests-batch-handle-test-group-finished-executing-with-nonexclusive-outcome ()
-  :num-runs 0
+  :num-runs 100
   (let ((messages))
     (cl-letf (((symbol-function 'message) (lambda (format-string &rest args)
 					    (push (apply #'format format-string args) messages))))
@@ -1271,7 +1271,7 @@
 	(should (s-contains-p expected-outcome-string message))))))
 
 (generate-ert-deftest-n-times generate--run-tests-batch-handle-run-ended-success ()
-  :num-runs 0
+  :num-runs 100
   (let ((messages))
     (cl-letf (((symbol-function 'message) (lambda (format-string &rest args)
 					    (push (apply #'format format-string args) messages))))
@@ -1291,7 +1291,7 @@
 	(should (length= actual-breakdown-list expected-breakdown-list-length))))))
 
 (generate-ert-deftest-n-times generate--run-tests-batch-handle-run-ended-aborted ()
-  :num-runs 0
+  :num-runs 100
   (let ((messages))
     (cl-letf (((symbol-function 'message) (lambda (format-string &rest args)
 					    (push (apply #'format format-string args) messages))))
@@ -1306,8 +1306,6 @@
 	(should-not (s-contains-p "Duration" actual-message))
 	(should-not (s-contains-p "Total tests" actual-message))
 	(should-not (s-contains-p "Breakdown:" actual-message))))))
-
-
 
 ;; Local Variables:
 ;; read-symbol-shorthands: (("g-" . "generate-"))
