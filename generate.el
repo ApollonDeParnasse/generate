@@ -211,51 +211,26 @@
                         ,(funcall setter
                                   `(cons ,key (cons ,val ,getter)))))))))))
 
-(defalias 'generate--first-and-last-item  (-juxt #'-first-item #'-last-item))
 (defalias 'generate--iterate-plus-one  (-partial #'-iterate #'1+))
 (defalias 'generate--applify-iterate-plus-one  (-applify #'generate--iterate-plus-one))
-
-
-(defalias 'generate--applify-equal (-applify #'equal))
 (defalias 'generate--applify-rpartial (-applify #'-rpartial))
 (defalias 'generate--applify-partial (-applify #'-partial))
-
 (defalias 'generate--applify-subtract (-applify #'-))
 (defalias 'generate--applify-multiply (-applify #'*))
 (defalias 'generate--applify-divide (-applify #'/))
-
-
 (defalias 'generate--applify-zip  (-applify #'-zip))
 (defalias 'generate--applify-zip-pair  (-applify #'-zip-pair))
-
-(defalias 'generate--applify-juxt  (-applify #'-juxt))
-
 (defalias 'generate--applify-cons  (-applify #'cons))
 (defalias 'generate--applify-concat  (-applify #'concat))
 (defalias 'generate--applify-vconcat  (-applify #'vconcat))
-(defalias 'generate--applify-append (-applify #'append))
-
-
 (defalias 'generate--applify-mapcar  (-applify #'mapcar))
 (defalias 'generate--applify-seq-split (-applify #'seq-split))
 (defalias 'generate--applify-seq-take (-applify #'seq-take))
 (defalias 'generate--applify-vector (-applify #'vector))
 (defalias 'generate--applify-map-elt (-applify #'map-elt))
-
-(defalias 'generate--seq-take-flipped (-flip #'seq-take))
-(defalias 'generate--applify-seq-take-flipped (-applify #'seq-take-flipped))
 (defalias 'generate--seq-elt-flipped (-flip #'seq-elt))
 (defalias 'generate--applify-seq-elt-flipped (-applify #'generate--seq-elt-flipped))
-
-(defalias 'generate--identity-and-length (-juxt #'identity #'length))
-
 (defalias 'generate--identity-and-seq-length (-juxt #'identity #'seq-length))
-(defalias 'generate---duplicate (-juxt #'identity #'identity))
-
-(defalias 'generate--any-true (-partial #'-any-p #'identity))
-(defalias 'generate---every-true (-partial #'-every-p #'identity))
-
-(defalias 'generate--flatten-one-level (-partial #'-flatten-n 1))
 
 (defun generate--times-helper (func n call-num)
   "Unless CALL-NUM is equal to N, call FUNC with CALL-NUM as arg."
