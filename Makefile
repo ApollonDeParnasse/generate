@@ -12,6 +12,14 @@ test-primitives:
 		 -l generate-primitives-tests.el \
 		 --eval "(generate-run-tests-batch-and-exit)";
 
+
+test-ert: ## Run ert tests
+test-ert: 
+	$(EMACS) --batch -L . \
+		 $(LOAD_PATH) \
+		 -l generate-ert-tests.el \
+		 --eval "(generate-run-tests-batch-and-exit)";
+
 test-runner: ## Run test-runner tests
 test-runner: 
 	$(EMACS) --batch -L . \
