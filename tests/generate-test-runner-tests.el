@@ -26,7 +26,9 @@
 
 ;;; Commentary:
 
-;;
+;; This file contains the code used to generate data for generate's test-runner
+;; along with the tests themselves. The functions are stored here as generate.el
+;; is already long enough as is. 
 
 ;;; Code:
 
@@ -57,8 +59,273 @@
 
 (defalias 'generate--TEST-SUMMARY-STRING-PREDICATES  (apply #'-orfn (mapcar (lambda (str) (-partial #'s-starts-with-p str)) generate--TEST-SUMMARY-STRINGS)))
 
+(defun generate--generate-test-base (test-identifier)
+  (cl-function (lambda (test-name next-test-index-for-group &key documentation tags file-name expected-result-type)
+    (generate-ert-test (format "%s-%s-%s" test-name test-identifier next-test-index-for-group) :documentation documentation :tags tags :file-name file-name :expected-result-type expected-result-type))))
+
+(defalias 'generate--generate-test (generate--generate-test-base generate--TEST-IDENTIFIER))
+
+(cl-defun generate--test-name-unfolder-base (test-identifier (count . name))
+  (generate--times count (lambda (index) (format "%s-%s-%s" name test-identifier index))))
+
+(defalias 'generate--test-name-unfolder (-partial #'generate--test-name-unfolder-base generate--TEST-IDENTIFIER))
+
+(cl-defun generate--generate-test-unfolder (test-group-name total-tests &optional expected-result-type)
+  (generate--times total-tests (lambda (index) (generate--generate-test test-group-name index :expected-result-type expected-result-type))))
+
+(defun generate--create-ert-tests-for-fake-test-group (test-group-name test-stats)
+  (-let* (((&plist :total-tests :expected-result-type) test-stats)
+	  (tests (generate--generate-test-unfolder test-group-name total-tests expected-result-type)))
+    tests))
+
+(defalias 'generate--create-list-of-tests-for-fake-tests-groups-alist (-compose (-partial #'-flatten-n 1) (-partial #'map-apply #'generate--create-ert-tests-for-fake-test-group)))
+
+(defalias 'generate--create-vector-of-tests-for-fake-tests-groups-alist (-compose #'generate--applify-vector #'generate--create-list-of-tests-for-fake-tests-groups-alist))
+
+(defun generate--fake-fresh-test-group-con-base (stats)
+  (lambda (counts name index)
+    (cons name (generate--plist-put :total-tests (nth index counts) stats))))
+(defalias 'generate--fake-fresh-test-group-con (generate--fake-fresh-test-group-con-base generate--TEST-GROUPS-PLIST))
+
+(defun generate--fake-fresh-tests-groups-alist-base (all-outcomes)
+  (lambda ()
+    (let* ((group-names (generate-random-list-of-unique-strings))
+	   (total-relative-tests-count (length group-names))
+	   (test-counts (generate--list-of-n-nat-numbers-in-range-5 :exact-length total-relative-tests-count))
+	   (total-absolute-tests-count (-sum test-counts))
+	   (tests-groups-alist (seq-map-indexed (-partial #'generate--fake-fresh-test-group-con test-counts) group-names)))
+      (list tests-groups-alist total-relative-tests-count total-absolute-tests-count group-names))))
+
+(defalias 'generate--fake-fresh-tests-groups-alist (generate--fake-fresh-tests-groups-alist-base generate--DEFAULT-OUTCOMES-PLIST))
+
+(defun generate--create-fresh-ert-stats-for-tests-groups-alist (tests-groups-alist)
+  (let ((tests (generate--create-vector-of-tests-for-fake-tests-groups-alist tests-groups-alist)))
+    (ert--make-stats tests 't)))
+
+(defun generate--fake-fresh-tests-groups-alist-and-stats ()
+  (-let* (((tests-groups-alist total-relative-tests-count total-absolute-tests-count group-names) (generate--fake-fresh-tests-groups-alist))
+	  (stats (generate--create-fresh-ert-stats-for-tests-groups-alist tests-groups-alist)))
+    (list tests-groups-alist stats total-relative-tests-count total-absolute-tests-count group-names)))
+
+(defun generate--fake-mid-run-tests-groups-con-for-x-type (outcome finishedp)
+  (-let* ((((ert-test-name . stats) _ completed-tests-count-for-group absolute-outcomes-counts-plist) (generate--random-fake-completed-test-group-con-for-outcome-x outcome))
+	  (tests-to-add (if finishedp 1 (1+ (generate--random-nat-number-in-range-25))))
+	  (next-test-index-for-group completed-tests-count-for-group)
+	  (total-tests-count-for-group (+ completed-tests-count-for-group tests-to-add))
+	  (new-stats (generate--plist-put :total-tests total-tests-count-for-group stats))
+	  (test-group-con (cons ert-test-name new-stats)))
+  (list test-group-con
+	ert-test-name
+	next-test-index-for-group
+	completed-tests-count-for-group
+	total-tests-count-for-group
+	absolute-outcomes-counts-plist)))
+
+(defun generate--fake-mid-run-tests-groups-alist-for-x-type-base (all-outcomes)
+  (lambda (outcome finishedp)
+    (-let* (((fresh-tests-groups-alist _ fresh-total-absolute-tests-count) (generate--fake-fresh-tests-groups-alist))
+	    ((currently-executing-test-group ert-test-name next-test-index-for-group completed-tests-count-for-group
+			     total-tests-count-for-group absolute-outcomes-counts-plist)
+	     (generate--fake-mid-run-tests-groups-con-for-x-type outcome finishedp))
+	    (absolute-completed-tests-count completed-tests-count-for-group)
+	    (mid-run-tests-groups-alist (list currently-executing-test-group))
+	    (absolute-total-tests-count (+ fresh-total-absolute-tests-count total-tests-count-for-group))
+	    (full-tests-groups-alist (map-merge 'alist mid-run-tests-groups-alist fresh-tests-groups-alist)))
+      (list
+       full-tests-groups-alist
+       fresh-tests-groups-alist
+       currently-executing-test-group
+       ert-test-name
+       next-test-index-for-group
+       completed-tests-count-for-group
+       total-tests-count-for-group
+       absolute-total-tests-count
+       absolute-outcomes-counts-plist))))
+
+(defalias 'generate--fake-mid-run-tests-groups-alist-for-x-type (generate--fake-mid-run-tests-groups-alist-for-x-type-base 'generate--DEFAULT-OUTCOMES-PLIST))
+
+(defun generate--fake-mid-run-ert-stats-for-tests-groups-alist-base (test-identifier)
+  (lambda (full-tests-groups-alist
+	   currently-executing-test-group
+	   next-test-index-for-group
+	   test-outcome
+	   completed-tests-count-for-group
+	   absolute-total-tests-count)
+    (-let* (((currently-executing-test-group-name . (&plist :test-results :test-start-times :test-end-times)) currently-executing-test-group)
+	    (all-tests (generate--create-list-of-tests-for-fake-tests-groups-alist full-tests-groups-alist))
+	    (test-map (map-into (seq-map-indexed (lambda (test index) (cons (ert-test-name test) index)) all-tests) 'hash-table))
+	    (next-ert-test (nth (map-elt test-map (intern (format "%s-%s-%s" currently-executing-test-group-name test-identifier next-test-index-for-group))) all-tests))
+	    (random-duration (generate-random-float))
+	    (next-ert-test-result (generate-ert-test-result-object test-outcome random-duration))
+	    ((completed-results completed-start-times completed-end-times) (mapcar #'generate--applify-vector (list test-results test-start-times test-end-times)))
+	    (total-nils (- absolute-total-tests-count completed-tests-count-for-group))
+	    ((nil-results nil-start-times nil-end-times) (generate--times-no-args 3 (lambda () (make-vector total-nils nil))))
+	    (stats
+	     (make-ert--stats :selector 't
+			      :start-time (generate--get-min-lisp-timestamp test-start-times)
+			      :end-time (generate--get-max-lisp-timestamp test-end-times)
+			      :tests (generate--applify-vector all-tests)
+			      :test-map test-map
+			      :test-results (vconcat completed-results nil-results)
+			      :test-start-times (vconcat completed-start-times nil-start-times)
+			      :test-end-times (vconcat completed-end-times nil-end-times))))
+      (list stats next-ert-test next-ert-test-result))))
+
+(defalias 'generate--fake-mid-run-ert-stats-for-tests-groups-alist (generate--fake-mid-run-ert-stats-for-tests-groups-alist-base generate--TEST-IDENTIFIER))
+
+(defun generate--fake-mid-run-data-for-x-type (finishedp)
+  (lambda (outcome)
+    (-let* (((full-tests-groups-alist
+	      fresh-tests-groups-alist
+	      currently-executing-test-group
+	      currently-executing-test-group-name
+	      next-test-index-for-group
+	      completed-tests-count-for-group
+	      total-tests-count-for-group
+	      absolute-total-tests-count
+	      absolute-outcomes-counts-plist)
+	     (generate--fake-mid-run-tests-groups-alist-for-x-type outcome finishedp))
+	    ((ert-test-stats next-ert-test next-ert-test-result) (generate--fake-mid-run-ert-stats-for-tests-groups-alist
+								  full-tests-groups-alist
+								  currently-executing-test-group
+								  next-test-index-for-group
+								  outcome
+								  completed-tests-count-for-group
+								  absolute-total-tests-count)))
+      (list full-tests-groups-alist ert-test-stats next-ert-test next-ert-test-result currently-executing-test-group-name next-test-index-for-group completed-tests-count-for-group total-tests-count-for-group absolute-outcomes-counts-plist))))
+
+(defalias 'generate--fake-mid-run-data-for-group-with-one-more-test-left (generate--fake-mid-run-data-for-x-type 't))
+
+(defalias 'generate--fake-mid-run-data-for-group-with-more-than-one-test-left (generate--fake-mid-run-data-for-x-type 'nil))
+
+(defun generate--fake-completed-test-group-con-for-outcome-x (base-outcomes-counts-plist)
+  (-lambda ((group-name requested-outcome expected-result-type
+			count-for-requested-outcome result-for-requested-outcome
+			compatible-outcome count-for-compatible-outcome result-for-compatible-outcome
+			test-start-time test-end-time test-duration))
+    (-let* ((to-merge-absolute (list (copy-sequence base-outcomes-counts-plist) (list requested-outcome count-for-requested-outcome) (list compatible-outcome count-for-compatible-outcome)))
+	    (absolute-outcomes-counts-plist (generate--map-merge-with-plus-plist to-merge-absolute))
+	    (absolute-total-tests (+ count-for-requested-outcome count-for-compatible-outcome))
+	    (duration (* absolute-total-tests test-duration))
+	    (requested-results (make-list count-for-requested-outcome result-for-requested-outcome))
+	    (test-results (if count-for-compatible-outcome
+			      (generate-append-and-shuffle requested-results (make-list count-for-compatible-outcome result-for-compatible-outcome))
+			    requested-results))
+	    (total-duration-reason-result (list
+					   :expected-result-type expected-result-type
+					   :total-tests absolute-total-tests
+					   :completed-tests absolute-total-tests
+					   :duration duration
+					   :test-start-times (make-list absolute-total-tests test-start-time)
+					   :test-end-times (make-list absolute-total-tests test-end-time)
+					   :test-results test-results))
+	    (all-stats (append absolute-outcomes-counts-plist total-duration-reason-result)))
+      (list (cons group-name all-stats) absolute-total-tests absolute-outcomes-counts-plist))))
+
+(cl-defun generate--create-data-for-fake-completed-test-group (all-outcomes counts-for-requested-outcome counts-for-compatible-outcome (test-start-times test-end-times test-durations))
+  (-lambda ((group-name . requested-outcome) index)
+    (-let* ((requested-outcome-attributes (generate--plist-get requested-outcome all-outcomes))
+	    ((requested-outcome-exclusivep compatible-outcome expected-result-type) (funcall (-juxt (-partial #'generate--plist-get :exclusive)
+												    (-partial #'generate--plist-get :compatible)
+												    (-partial #'generate--plist-get :expected-result-type))
+											     requested-outcome-attributes))
+	    ((count-for-requested-outcome test-start-time test-end-time test-duration) (mapcar (-partial #'generate-nth-mod index)
+											       (list counts-for-requested-outcome test-start-times test-end-times test-durations)))
+	    (result-for-requested-outcome (generate-ert-test-result-object requested-outcome test-duration))
+	    ((count-for-compatible-outcome result-for-compatible-outcome) (if requested-outcome-exclusivep
+									      (list 0 nil)
+									    (list (generate-nth-mod index counts-for-compatible-outcome) (generate-ert-test-result-object compatible-outcome test-duration)))))
+      (list group-name requested-outcome expected-result-type count-for-requested-outcome result-for-requested-outcome
+	    compatible-outcome count-for-compatible-outcome result-for-compatible-outcome
+	    test-start-time test-end-time test-duration))))
+
+(defun generate--random-fake-completed-test-group-con-for-outcome-x-base (all-outcomes requested-outcome)
+  (-let* ((base-outcomes-counts-plist (-interleave (map-keys all-outcomes) (make-list (length all-outcomes) 0)))
+	  (other-outcomes (funcall (-compose (-partial #'-remove (-partial #'equal requested-outcome)) #'map-keys) all-outcomes))
+	  (group-name (generate-random-string))
+	  (counts-for-requested-outcome (list (generate--random-nat-number-in-range-25)))
+	  (counts-for-compatible-outcome (list (generate--random-nat-number-in-range-25)))
+	  (time-data (generate--list-of-n-unzipped-starts-ends-durations 1))
+	  (fake-data-generator (generate--create-data-for-fake-completed-test-group
+		      all-outcomes
+		      counts-for-requested-outcome
+		      counts-for-compatible-outcome
+		      time-data))
+	  (fake-data (funcall fake-data-generator (cons group-name requested-outcome) 0))
+	  (con-generator (generate--fake-completed-test-group-con-for-outcome-x base-outcomes-counts-plist))
+	  ((test-group-con total-test-count outcomes-count-plist) (funcall con-generator fake-data)))
+    (list test-group-con group-name total-test-count outcomes-count-plist)))
+
+(defalias 'generate--random-fake-completed-test-group-con-for-outcome-x (-partial #'generate--random-fake-completed-test-group-con-for-outcome-x-base generate--DEFAULT-OUTCOMES-PLIST))
+
+(defun generate--fake-completed-tests-groups-alist-base (all-outcomes requested-outcome)
+  (-let* ((base-outcomes-counts-plist (-interleave (map-keys all-outcomes) (make-list (length all-outcomes) 0)))
+	  (other-outcomes (funcall (-compose (-partial #'-remove (-partial #'equal requested-outcome)) #'map-keys) all-outcomes))
+	  (expected-group-names (generate-random-list-of-unique-strings))
+	  (other-group-names (seq-map-indexed (lambda (name index) (concat (generate-seq-shuffle name) (number-to-string index))) expected-group-names))
+	  (requested-groups (generate--zip-pair-longest expected-group-names (list requested-outcome)))
+	  (other-groups (generate--zip-pair-first other-group-names other-outcomes))
+	  (all-groups (generate-append-and-shuffle requested-groups other-groups))
+	  (total-expected-groups (length expected-group-names))
+	  (total-other-groups (length other-group-names))
+	  (total-groups (+ total-expected-groups total-other-groups))
+	  (counts-for-requested-outcome (generate--list-of-n-nat-numbers-in-range-10 :exact-length total-groups))
+	  (counts-for-compatible-outcome (generate--list-of-n-nat-numbers-in-range-10 :exact-length total-groups))
+	  (time-data (generate--list-of-n-unzipped-starts-ends-durations total-groups))
+	  (fake-data-generator (generate--create-data-for-fake-completed-test-group
+				all-outcomes
+				counts-for-requested-outcome
+				counts-for-compatible-outcome
+				time-data))
+	  (fake-data (seq-map-indexed fake-data-generator all-groups))
+	  (alist-generator (generate--fake-completed-test-group-con-for-outcome-x base-outcomes-counts-plist))
+	  ((tests-groups-alist list-of-total-tests-count list-of-absolute-outcomes-count-plists) (funcall (-compose #'-unzip-lists #'mapcar) alist-generator fake-data))
+	  (absolute-outcomes-counts-plist (generate--map-merge-with-plus-plist list-of-absolute-outcomes-count-plists))
+	  (list-of-relative-outcomes-counts-plist (append (list (list requested-outcome total-expected-groups)) (mapcar (-lambda ((_ . outcome)) (list outcome 1)) other-groups)))
+	  (relative-outcomes-counts-plist (generate--map-merge-with-plus-plist list-of-relative-outcomes-counts-plist)))
+    (list tests-groups-alist expected-group-names other-group-names (-sum list-of-total-tests-count) absolute-outcomes-counts-plist relative-outcomes-counts-plist)))
+
+(defalias 'generate--fake-completed-tests-groups-alist (-partial #'generate--fake-completed-tests-groups-alist-base generate--DEFAULT-OUTCOMES-PLIST))
+
+(defalias 'generate--random-fake-completed-tests-groups-alist (-compose #'generate--fake-completed-tests-groups-alist #'generate--random-ert-test-outcome))
+
+(defun generate--create-completed-ert-stats-for-tests-groups-alist-mapper (tests-groups-alist)
+  (lambda (test index)
+    (-let* (((name . number) (generate--get-group-name-and-index-for-test test))
+	    (test-group-stats (map-elt tests-groups-alist name))
+	    (test-result (seq-elt (generate--plist-get :test-results test-group-stats) number))
+	    (test-start-time (seq-elt (generate--plist-get :test-start-times test-group-stats) number))
+	    (test-end-time (seq-elt (generate--plist-get :test-end-times test-group-stats) number)))
+      (list (cons name index) test-result test-start-time test-end-time))))
+
+(defun generate--create-completed-ert-stats-for-tests-groups-alist (total-tests tests-groups-alist)
+  (-let* ((tests (generate--create-vector-of-tests-for-fake-tests-groups-alist tests-groups-alist))
+	  ((test-map test-results test-start-times test-end-times) (funcall (-compose
+									     (-partial #'-flatten-n 1)
+									     (-juxt (-compose (-rpartial #'map-into 'hash-table) #'car) (-compose (-partial #'mapcar #'generate--applify-vector) #'cdr))
+									     #'-unzip-lists
+									     (-partial #'seq-map-indexed (generate--create-completed-ert-stats-for-tests-groups-alist-mapper tests-groups-alist)))
+									     tests)))
+    (make-ert--stats :selector 't
+		     :start-time (generate--get-min-lisp-timestamp test-start-times)
+		     :end-time (generate--get-max-lisp-timestamp test-end-times)
+                     :tests tests
+                     :test-map test-map
+                     :test-results test-results
+                     :test-start-times test-start-times
+                     :test-end-times test-end-times)))
+
+(defun generate--fake-completed-tests-groups-alist-and-stats (requested-outcome)
+  (-let* (((tests-groups-alist group-names-for-requested-outcome other-group-names absolute-total-tests-count absolute-outcomes-counts-plist relative-outcomes-counts-plist) (generate--fake-completed-tests-groups-alist requested-outcome))
+	  (stats (generate--create-completed-ert-stats-for-tests-groups-alist absolute-total-tests-count tests-groups-alist)))
+    (list tests-groups-alist stats group-names-for-requested-outcome other-group-names absolute-total-tests-count absolute-outcomes-counts-plist relative-outcomes-counts-plist)))
+
+(defalias 'generate--random-fake-completed-tests-groups-alist-and-stats (-compose #'generate--fake-completed-tests-groups-alist-and-stats #'generate--random-ert-test-outcome))
+
+;; Above functions will be used in the following tests:
+
 (generate-ert-deftest-n-times generate--parse-keys-and-body-body-only ()
-  :num-runs 0
+  :num-runs 100
   (let* ((test-body (generate-random-should))
 	 (test-docstring-keys-and-body (list test-body)))
     (cl-destructuring-bind
