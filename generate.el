@@ -463,30 +463,9 @@ If NUM-RUNS is not specified, your test will be defined 100 times.
 (defun generate--summary-message (initial-value zipped-outcomes)
   (seq-reduce #'generate--summary-message-helper zipped-outcomes initial-value))
 
-(cl-defun generate--default-message-printer (outcome message with-results (test-name . test-stats))
-  (thunk-let* ((duration (plist-get test-stats :duration #'equal))
-	       (reasons (plist-get test-stats :reasons #'equal))
-	       (with-reasons (g--len-gt0 (getenv "EMACS_TEST_VERBOSE")))
-	       (results (mapcar (-compose #'backtrace-to-string #'ert-test-result-with-condition-backtrace) (plist-get test-stats :test-results #'equal)))
-	       (reasons-results (-zip-pair results reasons)))
-    (message "%s %s \n Duration: %s" test-name message duration)
-    (cond
-     ((equal outcome :passed-as-expected))
-     ((not with-results))
-     ((and with-results (not with-reasons)) (mapc #'print reasons))
-     ((and with-results with-reasons) (mapc (-lambda ((reason . result)) (message "%s \n %s" reason result)) reasons-results)))))
-
-(defalias 'generate--passed-as-expected-message-printer (-partial #'generate--default-message-printer :passed-as-expected "passed as expected" 'nil))
-
-(defalias 'generate--failed-as-expected-message-printer (-partial #'generate--default-message-printer :failed-expected "failed as expected" 'nil))
-
-(defalias 'generate--skipped-message-printer (-partial #'generate--default-message-printer :skipped "was skipped" 'nil))
-
-(defalias 'generate--failed-unexpected-message-printer (-partial #'generate--default-message-printer :failed-unexpected "failed unexpectedly" 't))
-
-(defalias 'generate--passed-unexpected-message-printer (-partial #'generate--default-message-printer :passed-unexpected "passed unexpectedly" 'nil))
-
 (cl-defun generate--maybe-print-backtrace (stats test result)
+  "Maybe print backtrace."
+  "This was lifted directly from `generate-run-tests-batch'."
   (unless (ert-test-result-expected-p test result)
     (cl-etypecase result
       (ert-test-passed
@@ -651,13 +630,6 @@ If NUM-RUNS is not specified, your test will be defined 100 times.
     (let ((current-time-list nil))
       (ignore-errors (when (decode-time val) 't)))))
 
-(cl-defun generate--scale-float-to-range ((min max) float)
-  "Scale FLOAT until it is greater than or equal to MIN and less than MAX."
-  (let* ((float-min (- float (1- min)))
-	 (max-min (- max min)))
-    (* (/ (float min) max-min) max-min) float-min))
-(generate--scale-float-to-range (list 1 10) 50)
-
 (defalias 'generate--divide-list-values-by-max-list-value (-compose #'generate--applify-mapcar (-juxt (-compose #'generate--applify-rpartial (-partial #'list #'/) #'float #'1+ #'-max) #'identity)) "Divide each value in LIST by the max value of LIST.")
 
 (cl-defun generate--non-zero-bounded-modular-addition ((range-min range-max) increase current-number)
@@ -813,8 +785,6 @@ In other words, use an exclusive range: [MIN, MAX)"
 	 (generate--random-nat-number)))
 
 (defalias 'generate-random-nat-number-range (generate-default-convert-n-gen-to-random #'generate-nat-number-range))
-
-
 
 (defalias 'generate-random-list-of-cl-constantlys (-compose (-juxt #'identity #'generate--seq-map-cl-constantly) #'generate--random-nat-number-list-in-range-255) "Returns a list of random cl-constantlys and the values that each cl-constantly will return when called.")
 

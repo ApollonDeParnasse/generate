@@ -843,19 +843,8 @@
     (should (natnump actual-total-tests-count-for-group))
     (should (plistp actual-absolute-outcomes-counts-plist))))
 
-(generate-ert-deftest-n-times generate--fake-mid-run-tests-groups-alist-and-stats-for-x-type-one-test-left ()
-  :num-runs 0
-  (-let* ((test-outcome (generate--random-ert-test-outcome))
-	  ((actual-tests-groups-alist actual-ert-stats actual-group-name actual-next-test-index actual-completed-tests-count-for-group actual-total-tests-count-for-group actual-absolute-outcomes-counts-plist)
-	   (generate--fake-mid-run-tests-groups-alist-and-stats-for-x-type test-outcome 'nil)))
-    (should (map-elt actual-tests-groups-alist actual-group-name))
-    (should (ert--stats-p actual-ert-stats))
-    (should (natnump actual-next-test-index))
-    (should (natnump actual-total-tests-count-for-group))
-    (should (plistp actual-absolute-outcomes-counts-plist))))
-
 (generate-ert-deftest-n-times generate--fake-completed-test-group-con-for-outcome-x-for-non-exclusive-outcomes ()
-  :num-runs 0
+  :num-runs 100
   (-let*  ((test-group-name (generate-random-string))
 	   (test-requested-outcome (generate--random-non-exclusive-ert-test-outcome))
 	   (test-count-for-requested-outcome (generate--random-nat-number-in-range-10))
