@@ -4,7 +4,7 @@
 ;; Maintainer: Earl Chase
 ;; Version: 0.0
 ;; Keywords: testing
-;; Package-Requires: ((emacs "30") (org "9.7") (dash "2.20.0") (s "1.13.1") (compat "29"))
+;; Package-Requires: ((emacs "30") (dash "2.20.0") (s "1.13.1"))
 ;; Homepage: https://github.com/ApollonDeParnasse/generate
 
 ;; This file is NOT part of GNU Emacs.
