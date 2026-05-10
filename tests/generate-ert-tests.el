@@ -4,7 +4,7 @@
 ;; Maintainer: Earl Chase
 ;; Version: 0.0
 ;; Keywords: testing
-;; Package-Requires: ((emacs "30") (org "9.7") (dash "2.20.0") (s "1.13.1") (compat "29"))
+;; Package-Requires: ((emacs "30") (dash "2.20.0") (s "1.13.1"))
 ;; Homepage: https://github.com/ApollonDeParnasse/generate
 
 ;; This file is NOT part of GNU Emacs.
@@ -109,28 +109,28 @@
 	 (actual-car (car (generate-seq-take-random-value-from-seq actual-list-of-passing-should-forms))))
     (should (symbolp actual-car))))
 
-(generate-ert-deftest-n-times generate-ert-test-failed-error ()
-  :num-runs 0
+(generate-ert-deftest-n-times generate--ert-test-failed-error ()
+  :num-runs 100
   (-let* ((test-should (generate-random-failing-should))
-	 ((actual-error actual-val) (generate-ert-test-failed-error test-should)))
+	 ((actual-error actual-val) (generate--ert-test-failed-error test-should)))
     (should (equal actual-error 'ert-test-failed))
     (should (symbolp (caar actual-val)))))
 
-(generate-ert-deftest-n-times generate-ert-test-failed-condition ()
-  :num-runs 0
+(generate-ert-deftest-n-times generate--ert-test-failed-condition ()
+  :num-runs 100
   (-let* ((test-should (generate-random-failing-should))
-	 ((actual-error _) (generate-ert-test-failed-condition test-should)))
+	 ((actual-error _) (generate--ert-test-failed-condition test-should)))
     (should (symbolp actual-error))))
 
-(generate-ert-deftest-n-times generate-ert-test-skipped-condition ()
-  :num-runs 0
+(generate-ert-deftest-n-times generate--ert-test-skipped-condition ()
+  :num-runs 100
   (-let* ((test-should (generate-random-failing-should))
-	 ((actual-condition-symbol actual-val) (generate-ert-test-skipped-condition test-should)))
+	 ((actual-condition-symbol actual-val) (generate--ert-test-skipped-condition test-should)))
     (should (equal actual-condition-symbol 'ert-test-skipped))
     (should (symbolp (caar actual-val)))))
 
 (generate-ert-deftest-n-times generate-ert-test-result-object-passed-expected-unexpected ()
-  :num-runs 0
+  :num-runs 100
   (let* ((test-duration (generate-random-nat-number))
 	 (test-outcome (generate-seq-take-random-value-from-seq (list :passed-expected :passed-unexpected)))
 	 (actual-ert-test-result (generate-ert-test-result-object test-outcome test-duration)))
@@ -140,7 +140,7 @@
     (should (numberp (ert-test-result-duration actual-ert-test-result)))))
 
 (generate-ert-deftest-n-times generate-ert-test-result-object-failed-skipped ()
-  :num-runs 0
+  :num-runs 100
   (-let* ((test-duration (generate-random-nat-number))
 	  (test-outcome (generate-seq-take-random-value-from-seq (list :failed-unexpected :failed-expected :skipped)))
 	  ((expected-condition-symbol expected-result-type) (generate--plist-get test-outcome (list :failed-unexpected (list 'ert-test-failed :failed)
@@ -154,14 +154,14 @@
     (should (backtrace-frame-p (generate-seq-take-random-value-from-seq (ert-test-result-with-condition-backtrace actual-ert-test-result))))))
 
 (generate-ert-deftest-n-times generate--plist-of-ert-test-result-objects ()
-  :num-runs 0
+  :num-runs 100
   (-let* ((test-durations (generate-list-of-nat-numbers :exact-length (length generate--DEFAULT-OUTCOMES)))
 	  (test-outcome-duration-pairs (-zip-lists generate--DEFAULT-OUTCOMES test-durations))
 	  (actual-plist-of-ert-test-result-objects (generate--plist-of-ert-test-result-objects test-outcome-duration-pairs)))
     (should (ert-test-result-p (car (generate-map-random-value actual-plist-of-ert-test-result-objects))))))
 
 (generate-ert-deftest-n-times generate--take-from-plist-of-ert-test-results ()
-  :num-runs 0
+  :num-runs 100
   (-let* ((test-durations (generate-list-of-nat-numbers :exact-length (length generate--DEFAULT-OUTCOMES)))
 	  (test-outcome-counts (generate--list-of-n-nat-numbers-in-range-10 :exact-length (length generate--DEFAULT-OUTCOMES)))
 	  (test-outcome-duration-pairs (-zip-lists generate--DEFAULT-OUTCOMES test-durations))

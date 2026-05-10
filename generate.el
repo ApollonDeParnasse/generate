@@ -1,4 +1,4 @@
-;;; generate.el --- Random testing for Emacs Lisp -*- lexical-binding: t; no-byte-compile: t -*-
+;;; generate.el --- Random testing utilities for Emacs Lisp -*- lexical-binding: t -*-
 
 ;; Author: Earl Chase
 ;; Maintainer: Earl Chase
@@ -213,10 +213,10 @@ comparison function always set to `equal'."
                         ,(funcall setter
                                   `(cons ,key (cons ,val ,getter)))))))))))
 
-(defalias 'generate--iterate-plus-one  (-partial #'-iterate #'1+))
+(defalias 'generate--iterate-plus-one  (apply-partially #'-iterate #'1+))
 (defalias 'generate--applify-iterate-plus-one  (-applify #'generate--iterate-plus-one))
 (defalias 'generate--applify-rpartial (-applify #'-rpartial))
-(defalias 'generate--applify-partial (-applify #'-partial))
+(defalias 'generate--applify-apply-partially (-applify #'apply-partially))
 (defalias 'generate--applify-subtract (-applify #'-))
 (defalias 'generate--applify-multiply (-applify #'*))
 (defalias 'generate--applify-divide (-applify #'/))
@@ -271,9 +271,10 @@ Returns a closure that be used to zip SHORT-LIST with LONG-LIST."
 Make a pair with the head of each list, followed by a pair with
 the second element of each list, and so on.  The number of pairs
 returned is equal to the length of the longest input list."
+  (declare (pure t) (side-effect-free t))
   (thunk-let* ((length-one (length list-one))
 	       (length-two (length list-two))
-	       (sorted-lists (if (g--gt length-one length-two) (list (list 0 list-one) (list 1 list-two)) (list (list 1 list-two) (list 0 list-one))))
+	       (sorted-lists (if (> length-one length-two) (list (list 0 list-one) (list 1 list-two)) (list (list 1 list-two) (list 0 list-one))))
 	       (longest-list (cadr (car sorted-lists)))
 	       (shortest-list (cadr sorted-lists)))
     (if (equal length-one length-two)
@@ -311,6 +312,7 @@ KEYS-AND-BODY and adds them to COLLECTION."
 
 (defun generate--parse-keys-and-body (docstring-keys-and-body)
   "Converts DOCSTRING-KEYS-AND-BODY into a plist."
+  (declare (pure t) (side-effect-free t))
   (-let (((documentation keys-and-body) (if (stringp (car docstring-keys-and-body))
 					    (list (list :documentation (car docstring-keys-and-body)) (cdr docstring-keys-and-body))
 					  (list (list :documentation 'nil) docstring-keys-and-body))))
@@ -611,7 +613,7 @@ This was lifted directly from
 	     selector)))
 
 (cl-defun generate--run-tests-batch-handle-test-ended (tests-groups-alist (stats test result))
-  (generate--maybe-print-backtrace stats test result)
+  (generate--print-messages-for-unexpected-outcomes test result)
   (-let* ((test-name (ert-test-name test))
 	 ((test-group-name) (generate--get-group-name-and-index-for-test test))
 	 (test-absolute-index (map-elt (ert--stats-test-map stats) test-name))
@@ -807,7 +809,7 @@ In other words, use an exclusive range: [MIN, MAX)"
   (thunk-let* ((rand-one (generate-random-nat-number-in-range (list min max)))
 	       (distance-from-min (- rand-one min))
 	       (distance-from-max (- max rand-one))
-	       (min-max (if (g--gt distance-from-max distance-from-min) (list (1+ rand-one) max) (list min (1- rand-one))))
+	       (min-max (if (> distance-from-max distance-from-min) (list (1+ rand-one) max) (list min (1- rand-one))))
 	       (rand-two (generate-random-nat-number-in-range min-max)))
   (if (eql min max)
       (list min min)
@@ -825,21 +827,21 @@ Each number will be that are greater than or equal to MIN less than MAX.
 
 (defalias 'generate-random-nat-number-string (-compose #'number-to-string #'generate-random-nat-number) "Returns a random natural number as a string.")
 
-(defalias 'generate-random-negative-number (-partial #'generate-random-nat-number-in-range generate--NEGATIVENUMS) "Returns a random negative number.")
+(defalias 'generate-random-negative-number (apply-partially #'generate-random-nat-number-in-range generate--NEGATIVENUMS) "Returns a random negative number.")
 
-(defalias 'generate--random-nat-number-in-range-1-to-5 (-partial #'generate-random-nat-number-in-range generate--FIVERANGE) "Returns a random number that is greater than or equal to 1 and less than 5.")
+(defalias 'generate--random-nat-number-in-range-1-to-5 (apply-partially #'generate-random-nat-number-in-range generate--FIVERANGE) "Returns a random number that is greater than or equal to 1 and less than 5.")
 
-(defalias 'generate--random-nat-number-in-range-10 (-partial #'generate-random-nat-number-in-range generate--TENRANGE) "Returns a random number that is greater than or equal to 1 and less than 10.")
+(defalias 'generate--random-nat-number-in-range-10 (apply-partially #'generate-random-nat-number-in-range generate--TENRANGE) "Returns a random number that is greater than or equal to 1 and less than 10.")
 
-(defalias 'generate--random-nat-number-in-range-0-10 (-partial #'generate-random-nat-number-in-range generate--ZEROTENRANGE) "Returns a random number that is greater than or equal to 0 and less than 10.")
+(defalias 'generate--random-nat-number-in-range-0-10 (apply-partially #'generate-random-nat-number-in-range generate--ZEROTENRANGE) "Returns a random number that is greater than or equal to 0 and less than 10.")
 
 (defalias 'generate--two-random-nat-numbers-in-range-10 (lambda () (generate--times-no-args-twice #'generate--random-nat-number-in-range-10)))
 
-(defalias 'generate--random-nat-number-in-range-25 (-partial #'generate-random-nat-number-in-range generate--ONETOTWENTYFIVE) "Returns a random number that is greater than or equal to 1 and less than 25.")
+(defalias 'generate--random-nat-number-in-range-25 (apply-partially #'generate-random-nat-number-in-range generate--ONETOTWENTYFIVE) "Returns a random number that is greater than or equal to 1 and less than 25.")
 
-(defalias 'generate--random-nat-number-in-range-3-25 (-partial #'generate-random-nat-number-in-range generate--THREETOTWENTYFIVE) "Returns a random number that is greater than or equal to 3 and less than 25.")
+(defalias 'generate--random-nat-number-in-range-3-25 (apply-partially #'generate-random-nat-number-in-range generate--THREETOTWENTYFIVE) "Returns a random number that is greater than or equal to 3 and less than 25.")
 
-(defalias 'generate--random-nat-number-in-range-5-25 (-partial #'generate-random-nat-number-in-range generate--FIVETOTWENTYFIVERANGE) "Returns a random number that is greater than or equal to 5 and less than 25.")
+(defalias 'generate--random-nat-number-in-range-5-25 (apply-partially #'generate-random-nat-number-in-range generate--FIVETOTWENTYFIVERANGE) "Returns a random number that is greater than or equal to 5 and less than 25.")
 
 (defalias 'generate--two-random-nat-numbers-in-range-25 (lambda () (generate--times-no-args-twice #'generate--random-nat-number-in-range-25)))
 
@@ -847,7 +849,6 @@ Each number will be that are greater than or equal to MIN less than MAX.
 
 (defalias 'generate--two-random-nat-numbers-in-range-5-25 (lambda () (generate--times-no-args-twice #'generate--random-nat-number-in-range-5-25)))
 
-(defalias 'generate--random-nat-number-in-range-50 (-partial #'generate-random-nat-number-in-range generate--FIFTYRANGE) "Returns a random number that is greater than or equal to 1 and less than 50.")
 (defalias 'generate--random-nat-number-in-range-50 (apply-partially #'generate-random-nat-number-in-range generate--FIFTYRANGE) "Returns a random number that is greater than or equal to 1 and less than 50.")
 
 (defalias 'generate--random-nat-number-in-range-255 (apply-partially #'generate-random-nat-number-in-range generate--DEFAULTRANDOMNUMBERRANGE) "Returns a random number that is greater than or equal to 1 and less than 255.")
@@ -1179,7 +1180,7 @@ we wrap back around."
     (t
 	(let* ((length (seq-length seq)))
 	 (if (> end length)
-	   (funcall (-compose (-rpartial #'seq-subseq start end) (-rpartial #'generate-seq-take-infinite seq) (-partial #'+ length) (-partial #'- end)) length)
+	   (funcall (-compose (-rpartial #'seq-subseq start end) (-rpartial #'generate-seq-take-infinite seq) (apply-partially #'+ length) (apply-partially #'- end)) length)
 	   (seq-subseq seq start end))))))
 
 (cl-defun generate--seq-n-random-subseqs-reducer (seq-to-slice (slices last-slice-end) curr-slice-size)
@@ -2026,16 +2027,18 @@ SYMBOL should be void-function or void-variable."
 				      :pos pos))
 		     list-of-positions)))
 
-(defalias 'generate-random-list-of-backtrace-frames (generate-default-convert-n-gen-to-random #'generate-list-of-n-backtrace-frames))
+(defalias 'generate-random-list-of-backtrace-frames (generate-default-convert-n-gen-to-random #'generate-list-of-n-backtrace-frames) "Returns a random list of backtrace frames.")
 
-(defalias 'generate--random-ert-test-outcome (-partial #'generate-seq-take-random-value-from-seq generate--DEFAULT-OUTCOMES))
+(defalias 'generate--random-ert-test-outcome (apply-partially #'generate-seq-take-random-value-from-seq generate--DEFAULT-OUTCOMES)
+  "Returns a random ert-test-outcome.")
 
-(defalias 'generate--random-ert-expected-result-type (-partial #'generate-seq-take-random-value-from-seq generate--EXPECTED-RESULT-TYPES))
+(defalias 'generate--random-ert-expected-result-type (apply-partially #'generate-seq-take-random-value-from-seq generate--EXPECTED-RESULT-TYPES))
 
 (defun generate--random-x-type-ert-test-outcome-base (default-outcomes-plist)
-  (lambda (type expected-val)
+  (lambda (key expected-val)
     (lambda ()
-      (let ((filtered-outcomes (map-filter (lambda (_ attributes) (equal (generate--plist-get type attributes) expected-val)) default-outcomes-plist)))
+      (:documentation (format "Returns a random ert-outcome whose %s equal %s." key expected-val))
+      (let ((filtered-outcomes (map-filter (lambda (_ attributes) (equal (generate--plist-get key attributes) expected-val)) default-outcomes-plist)))
 	(generate-map-random-key filtered-outcomes)))))
 
 (defalias 'generate--random-x-type-ert-test-outcome (generate--random-x-type-ert-test-outcome-base generate--DEFAULT-OUTCOMES-PLIST))
@@ -2059,7 +2062,7 @@ SYMBOL should be void-function or void-variable."
 	(`(nil should-not) (list assert-symbol should-val))))))
 
 (defun generate--catchall-should-pcase (n val)
-  (pcase-exhaustive (mod n 3)
+  (pcase-exhaustive (% n 3)
     (0 (list 'equal val val))
     (1 (list 'equal (list val) (list val)))
     (2 (list 'equal (vector val) (vector val)))))
@@ -2067,7 +2070,7 @@ SYMBOL should be void-function or void-variable."
 (defalias 'generate--catchall-should (generate--make-should-form-gen-for-type-x #'generate--catchall-should-pcase))
 
 (defun generate--number-should-pcase (n number)
-  (pcase-exhaustive (mod n 5)
+  (pcase-exhaustive (% n 5)
     (0 (list 'numberp number))
     (1 (list 'plusp (abs number)))
     (2 (list 'minusp (* 1 (abs number))))
@@ -2077,7 +2080,7 @@ SYMBOL should be void-function or void-variable."
 (defalias 'generate--number-should (generate--make-should-form-gen-for-type-x #'generate--number-should-pcase))
 
 (defun generate--symbol-should-pcase (n symbol)
-  (pcase-exhaustive (mod n 3)
+  (pcase-exhaustive (% n 3)
     (0 (list 'symbolp symbol))
     (1 (equal (list 'symbol-name symbol) (list 'symbol-name symbol)))
     (2 (generate--catchall-should-pcase n symbol))))
@@ -2085,7 +2088,7 @@ SYMBOL should be void-function or void-variable."
 (defalias 'generate--symbol-should (generate--make-should-form-gen-for-type-x #'generate--symbol-should-pcase))
 
 (defun generate--seq-should-pcase (n seq)
-  (pcase-exhaustive (mod n 5)
+  (pcase-exhaustive (% n 5)
     (0 (list 'seqp seq))
     (1 (list 'equal (list 'seq-positions seq) (list 'seq-positions seq)))
     (2 (list 'equal (list 'seq-uniq seq) (list 'seq-uniq seq)))
@@ -2095,7 +2098,7 @@ SYMBOL should be void-function or void-variable."
 (defalias 'generate--seq-should (generate--make-should-form-gen-for-type-x #'generate--seq-should-pcase))
 
 (defun generate--map-should-pcase (n map)
-  (pcase-exhaustive (mod n 5)
+  (pcase-exhaustive (% n 5)
     (0 (list 'mapp map))
     (1 (list 'equal (list 'map-keys map) (list 'map-keys map)))
     (2 (list 'equal (list 'map-values map) (list 'map-values map)))
@@ -2104,7 +2107,6 @@ SYMBOL should be void-function or void-variable."
 
 (defalias 'generate--map-should (generate--make-should-form-gen-for-type-x #'generate--map-should-pcase))
 
-;; is-type, is-equal-to-self, exists, extra
 (cl-defun generate--should-form-for-type-x (&key passing assert-symbol)
   (cl-function (lambda (&optional val)
 	       (let ((random-val (or val (generate-random-value))))
@@ -2323,9 +2325,9 @@ the ert-test object."
    (cons "map" generate--MAP-GENS))
   "Each type of generator in this list will available at run time.")
 
-(defalias 'generate--get-random-generator-type (-partial (-compose #'generate-seq-take-random-value-from-seq #'map-keys) generate--TYPE-GEN-MAP) "Get a random generator type from generate--TYPE-GEN-MAP.")
-(defalias 'generate--get-generators-of-type-x (-partial #'map-elt generate--TYPE-GEN-MAP) "Get the vector of generators for TYPE from generate--TYPE-GEN-MAP.")
-(defalias 'generate--get-random-generator (-compose #'generate-seq-take-random-value-from-seq (-partial #'generate-map-random-value generate--TYPE-GEN-MAP)) "Get a random generator from generate--TYPE-GEN-MAP.")
+(defalias 'generate--get-random-generator-type (apply-partially (-compose #'generate-seq-take-random-value-from-seq #'map-keys) generate--TYPE-GEN-MAP) "Get a random generator type from generate--TYPE-GEN-MAP.")
+(defalias 'generate--get-generators-of-type-x (apply-partially #'map-elt generate--TYPE-GEN-MAP) "Get the vector of generators for TYPE from generate--TYPE-GEN-MAP.")
+(defalias 'generate--get-random-generator (-compose #'generate-seq-take-random-value-from-seq (apply-partially #'generate-map-random-value generate--TYPE-GEN-MAP)) "Get a random generator from generate--TYPE-GEN-MAP.")
 
 (cl-defmacro generate--create-generate-random-x ((type . generators-list))
   "Create a generate-random-x-type function for TYPE.
