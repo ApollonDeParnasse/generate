@@ -1,557 +1,1404 @@
 * *Why?*
-* macros
-** generate-ert-deftest-times
-#+begin_src emacs-lisp :tangle yes
+#+begin
+This packages includes a host random data generators for almost every Emacs Lisp data type.
+This package also includes a wrapper for the ert-deftest macro called generate-ert-deftest-n-times.
+Finally this package includes two new test-runners, generate-run-tests-batch and generate-run-tests-batch-and-exit, drop in replacement for ert-run-tests-batch
+and ert-run-tests-batch-and-exit.
+#+end
+* *Naming Conventions*
+** generate-random-x:
+- no arguments, e.g., generate-random-vector, generate-random-string, generate-random-boolean
+** generate-x-of-n-y:
+- one argument, N, the number of y's that you want in type x, e.g., generate-list-of-n-strings, generate-list-of-n-symbols, generate-list-of-n-lisp-timestamp-ranges
+** generate-x-y:
+optional keywords arguments, e.g., [:max-length INTEGER] [:min-length INTEGER] [:exact-length INTEGER], generate-list-of-nat-numbers, generate-list-of-floats, generate-list-of-nat-numbers-in-range
+* *Example Usage*
+* customs
+#+begin_src elisp :tangle yes
+(defgroup generate nil
+  "Random generators for testing."
+  :tag "generate"
+  :group 'lisp)
 
+(defcustom generate-lisp-timestamp-range-size generate--SECONDS-IN-AN-HOUR
+  "The size of the range from which random timestamps will be taken."
+  :group 'generate
+  :type 'natnum)
+#+end_src
+* macros
+* test-runner
+** generate-ert-deftest-n-times
+#+begin_src emacs-lisp :tangle yes
+;;;###autoload
 (cl-defmacro generate-ert-deftest-n-times (name () &body docstring-keys-and-body)
-      "Define NAME (a symbol) as a `ert-deftest' n time where n = NUM-RUNS.
+  "Define NAME (a symbol) as a `ert-deftest' n times where n = NUM-RUNS.
 NUM-RUNS can be specified as a keyword argument in addition to
 the normal values of DOCSTRING-KEYS-AND-BODY.
 If NUM-RUNS is not specified, your test will be defined 100 times.
 
 \(fn NAME () [DOCSTRING] [:expected-result RESULT-TYPE] \
-[:tags \\='(TAG...)] [:num-runs INTEGERS] BODY...)"
-(declare (debug (&define [&name "test@" symbolp]
-                         sexp [&optional stringp]
-                         [&rest keywordp sexp]
-                         def-body))
+[:tags \\='(TAG...)] [:num-runs INTEGER] BODY...)"
+  (declare (debug (&define [&name "test@" symbolp]
+                           sexp [&optional stringp]
+                           [&rest keywordp sexp]
+                           def-body))
            (doc-string 3)
            (indent 2))
-  (let ((documentation nil)
-        (documentation-supplied-p nil)
-        (run-symbol (gensym)))
-(when (stringp (car docstring-keys-and-body))
-  (setq documentation (pop docstring-keys-and-body)
-        documentation-supplied-p t))
-(cl-destructuring-bind
-    ((&key (expected-result nil expected-result-supplied-p)
-           (tags nil tags-supplied-p)
-         (num-runs 100))
-     body)
-    (ert--parse-keys-and-body docstring-keys-and-body)
-  `(cl-macrolet ((skip-when (form) `(ert--skip-when ,form))
-                 (skip-unless (form) `(ert--skip-unless ,form)))
-     (dotimes (run-symbol ,num-runs)
-       (ert-set-test (intern (format "%s-%s" ',name run-symbol))
-                   (make-ert-test
-                    :name (intern (format "%s-%s" ',name run-symbol))
-                    ,@(when documentation-supplied-p
-                        `(:documentation ,documentation))
-                    ,@(when expected-result-supplied-p
-                        `(:expected-result-type ,expected-result))
-                    ,@(when tags-supplied-p
-                        `(:tags ,tags))
-                    :body (lambda () ,@body nil)
-                    :file-name ,(or (macroexp-file-name) buffer-file-name))))))))
+  (let ((run-symbol (gensym)))
+    (cl-destructuring-bind
+        (&key
+         (documentation nil documentation-supplied-p)
+         (expected-result nil expected-result-supplied-p)
+         (tags nil tags-supplied-p)
+         (num-runs 100)
+         (body nil))
+        (generate--parse-keys-and-body docstring-keys-and-body)
+      `(cl-macrolet ((skip-when (form) `(ert--skip-when ,form))
+                     (skip-unless (form) `(ert--skip-unless ,form)))
+         (dotimes (run-symbol ,num-runs)
+           (ert-set-test (intern (format "%s-%s-%s" ',name generate--TEST-IDENTIFIER run-symbol))
+                         (make-ert-test
+                          :name (intern (format "%s-%s-%s" ',name generate--TEST-IDENTIFIER run-symbol))
+                          ,@(when documentation-supplied-p
+                              `(:documentation ,documentation))
+                          ,@(when expected-result-supplied-p
+                              `(:expected-result-type ,expected-result))
+                          ,@(when tags-supplied-p
+                              `(:tags ,tags))
+                          :body (lambda () ,body nil)
+                          :file-name ,(or (macroexp-file-name) buffer-file-name))))))))
 #+end_src
-* numbers
-** generate-random-float-between-0-and-1
+* Utilities
+* generators
+** numbers
+*** generate-random-float-between-0-and-1
 #+begin_src emacs-lisp :tangle yes
 (defun generate-random-float-between-0-and-1 ()
   "Returns a float that is greater than 0 and less than 1."
   (funcall (-compose #'generate--convert-calc-value-into-lisp #'math-random-float)))
 #+end_src
-** generate-random-nat-number-in-range
+*** generate-random-nat-number-in-range
 #+begin_src emacs-lisp :tangle yes
 (cl-defun generate-random-nat-number-in-range ((min max))
-  "Returns a random number that is greater than or equal to MIN less than MAX."
+  "Returns a random number that is greater than or equal to MIN less than MAX.
+In other words, use an exclusive range: [MIN, MAX)"
   (if (eql min max)
       min
-    (funcall (-compose (-partial #'generate--scale-float-to-range (list min max)) #'generate-random-float-between-0-and-1))))
+    (generate--non-zero-bounded-modular-addition (list min max) 0 (generate--random-nat-number))))
 #+end_src
-** generate-random-nat-number-range
+*** generate-two-random-nat-numbers-in-range
 #+begin_src emacs-lisp :tangle yes
-(defun generate-random-nat-number-range (size)
-  "Returns a random n SIZE range.
-\(fn INTEGER)"
-  (funcall (-juxt #'identity (-partial #'+ size))
-         (math-random-three-digit-number)))
+(cl-defun generate-two-random-nat-numbers-in-range ((min max))
+  "Returns two random numbers that are greater than or equal to MIN less than MAX."
+  (thunk-let* ((rand-one (generate-random-nat-number-in-range (list min max)))
+               (distance-from-min (- rand-one min))
+               (distance-from-max (- max rand-one))
+               (min-max (if (> distance-from-max distance-from-min) (list (1+ rand-one) max) (list min (1- rand-one))))
+               (rand-two (generate-random-nat-number-in-range min-max)))
+  (if (eql min max)
+      (list min min)
+    (list rand-one rand-two))))
 #+end_src
-** generate-random-nat-number
+*** generate-two-sorted-random-nat-numbers-in-range
+#+begin_src elisp :tangle yes
+(defalias 'generate-two-sorted-random-nat-numbers-in-range (-compose #'sort #'generate-two-random-nat-numbers-in-range)  "Returns two sorted random numbers.
+Each number will be that are greater than or equal to MIN less than MAX.
+
+\(fn RANGE)")
+#+end_src
+*** generate-random-nat-number
 #+begin_src emacs-lisp :tangle yes
-(defalias 'generate-random-nat-number (-partial #'generate-random-nat-number-in-range generate--NATURALNUMBERS) "Returns a random natural number.")
+(defalias 'generate-random-nat-number (apply-partially #'generate-random-nat-number-in-range generate--NATURALNUMBERS) "Returns a random natural number.")
 #+end_src
-** generate-random-nat-number-string
+*** generate-random-nat-number-twice
+#+begin_src emacs-lisp :tangle yes
+(defalias 'generate-random-nat-number-twice (apply-partially #'generate--times-no-args-twice #'generate-random-nat-number)
+  "Returns two random natural numbers.")
+#+end_src
+*** generate-random-nat-number-string
 #+begin_src emacs-lisp :tangle yes
 (defalias 'generate-random-nat-number-string (-compose #'number-to-string #'generate-random-nat-number) "Returns a random natural number as a string.")
 #+end_src
-** generate-random-negative-number
+*** generate-random-negative-number
 #+begin_src emacs-lisp :tangle yes
-(defalias 'generate-random-negative-number (-partial #'generate-random-nat-number-in-range generate--NEGATIVENUMS) "Returns a random negative number.")
+(defalias 'generate-random-negative-number (apply-partially #'generate-random-nat-number-in-range generate--NEGATIVENUMS) "Returns a random negative number.")
 #+end_src
-** generate--random-nat-number-in-range-1-to-5
+*** generate-random-float
 #+begin_src emacs-lisp :tangle yes
-(defalias 'generate-random-nat-number-in-range-1-to-5 (-partial #'generate-random-nat-number-in-range generate--FIVERANGE) "Returns a random number that is greater than or equal to 1 and less than 5.")
+(defalias 'generate-random-float (-compose #'generate--divide-by-random-value #'generate--random-nat-number-in-range-255)  "Returns a random float.")
 #+end_src
-** generate--random-nat-number-in-range-10
-#+begin_src emacs-lisp :tangle yes
-(defalias 'generate--random-nat-number-in-range-10 (-partial #'generate-random-nat-number-in-range generate--TENRANGE) "Returns a random number that is greater than or equal to 1 and less than 10.")
-#+end_src
-** generate--two-random-nat-numbers-from-range-10
-#+begin_src elisp :tangle yes
-(defalias 'generate--two-random-nat-numbers-from-range-10 (lambda () (generate--times-no-args-twice #'generate--random-nat-number-in-range-10)))
-#+end_src
-** generate--random-nat-number-in-range-25
-#+begin_src emacs-lisp :tangle yes
-(defalias 'generate--random-nat-number-in-range-25 (-partial #'generate-random-nat-number-in-range generate--TWENTYFIVERANGE) "Returns a random number that is greater than or equal to 1 and less than 25.")
-#+end_src
-** generate--random-nat-number-in-range-3-25
-#+begin_src emacs-lisp :tangle yes
-(defalias 'generate--random-nat-number-in-range-3-25 (-partial #'generate-random-nat-number-in-range generate--THREETOTWENTYFIVERANGE) "Returns a random number that is greater than or equal to 3 and less than 25.")
-#+end_src
-** generate--random-nat-number-in-range-5-25
-#+begin_src emacs-lisp :tangle yes
-(defalias 'generate--random-nat-number-in-range-5-25 (-partial #'generate-random-nat-number-in-range generate--FIVETOTWENTYFIVERANGE) "Returns a random number that is greater than or equal to 5 and less than 25.")
-#+end_src
-** generate--two-random-nat-numbers-from-range-25
-#+begin_src elisp :tangle yes
-(defalias 'generate--two-random-nat-numbers-from-range-25 (lambda () (generate--times-no-args-twice #'generate--random-nat-number-in-range-25)))
-#+end_src
-** generate--two-random-nat-numbers-from-range-3-25
-#+begin_src elisp :tangle yes
-(defalias 'generate--two-random-nat-numbers-from-range-3-25 (lambda () (generate--times-no-args-twice #'generate--random-nat-number-in-range-3-25)))
-#+end_src
-** generate--two-random-nat-numbers-from-range-5-25
-#+begin_src elisp :tangle yes
-(defalias 'generate--two-random-nat-numbers-from-range-5-25 (lambda () (generate--times-no-args-twice #'generate--random-nat-number-in-range-5-25)))
-#+end_src
-** generate--random-nat-number-in-range-50
-#+begin_src emacs-lisp :tangle yes
-(defalias 'generate--random-nat-number-in-range-50 (-partial #'generate-random-nat-number-in-range generate--FIFTYRANGE) "Returns a random number that is greater than or equal to 1 and less than 50.")
-#+end_src
-** generate--random-nat-number-in-range-255
-#+begin_src emacs-lisp :tangle yes
-(defalias 'generate--random-nat-number-in-range-255 (-partial #'generate-random-nat-number-in-range generate--DEFAULTRANDOMNUMBERRANGE) "Returns a random number that is greater than or equal to 1 and less than 255.")
-#+end_src
-** generate--random-nat-number-in-range-500
-#+begin_src emacs-lisp :tangle yes
-(defalias 'generate--random-nat-number-in-range-500 (-partial #'generate-random-nat-number-in-range generate--FIVEHUNDREDRANGE) "Returns a random number that is greater than or equal to 1 and less than 500.")
-#+end_src
-** generate--random-nat-number-in-range-3-to-20
-#+begin_src emacs-lisp :tangle yes
-(defalias 'generate--random-nat-number-in-range-3-to-20 (-partial #'generate-random-nat-number-in-range generate--THREETO20) "Returns a random number that is greater than or equal to 3 and less than 20.")
-#+end_src
-** generate--random-nat-number-between-0-and
-#+begin_src emacs-lisp :tangle yes
-(defalias 'generate--random-nat-number-between-0-and (-compose #'generate-random-nat-number-in-range (-partial #'list 0)) "Returns a random number that is greater than or equal to 0 and less than N. \(fn INTEGER)")
-#+end_src
-** generate--random-nat-number-between-1-and
-#+begin_src elisp :tangle yes
-(defalias 'generate--random-nat-number-between-1-and (-compose #'generate-random-nat-number-in-range (-partial #'list 1)) "Returns a random number that is greater than or equal to 1 and less than N. \(fn INTEGER)")
-#+end_src
-** generate-random-float
-#+begin_src emacs-lisp :tangle yes
-(defun generate-random-float ()
-  "Returns a random float."
-  (generate--divide-by-random-value (generate--random-nat-number-in-range-255)) "Returns a random float.")
-#+end_src
-pp** DONE generate-random-float-string
+*** generate-random-float-string
 #+begin_src emacs-lisp :tangle yes
 (defalias 'generate-random-float-string (-compose #'number-to-string #'generate-random-float) "Returns a random float as a string.")
 #+end_src
-* functions
-** generate-call-function-random-times
+** meta generators
+*** generate-call-function-random-times
 #+begin_src emacs-lisp :tangle yes
 (defun generate-call-function-random-times (func)
   "Call a FUNC a random amount of times.
+
 \(fn FUNCTION)"
   (generate--times-no-args (generate--random-nat-number-in-range-10) func))
+#+end_src
+*** generate-call-each-function-random-times
+#+begin_src elisp :tangle yes
+(defalias 'generate-call-each-function-random-times (apply-partially #'mapcar #'generate-call-function-random-times) "Call each FUNC in LIST a random amount of times.
+The results will be collected into a list.
 
-(defalias 'generate-call-each-function-random-times (-partial #'mapcar #'generate-call-function-random-times) "Call each FUNC in LIST a random amount of times. The results will be collected into a list.")
+\(fn LIST)")
 #+end_src
-** generate-call-random-function
+*** generate-call-random-function
 #+begin_src emacs-lisp :tangle yes
-(defalias 'generate-call-random-function (-compose #'funcall #'generate-seq-take-random-value-from-seq) "Take a random function from LIST, call it and then return the result. \(fn LIST)")
+(defalias 'generate-call-random-function (-compose #'funcall #'generate-seq-take-random-value-from-seq) "Take a random function from LIST, call it and then return the result.
+
+\(fn LIST)")
 #+end_src
-** generate-call-random-function-n-times
+*** generate-call-random-function-n-times
 #+begin_src emacs-lisp :tangle yes
 (defun generate-call-random-function-n-times (n list)
   "Take a random function from LIST and call it N times.
+
 \(fn INTEGER LIST)"
-  (funcall (-compose (-partial #'generate--times-no-args n) #'generate-seq-take-random-value-from-seq) list))
+  (funcall (-compose (apply-partially #'generate--times-no-args n) #'generate-seq-take-random-value-from-seq) list))
 #+end_src
-** generate-call-random-function-random-times
+*** generate-call-random-function-random-times
 #+begin_src emacs-lisp :tangle yes
-(defalias 'generate-call-random-function-random-times (-compose #'generate-call-function-random-times #'generate-seq-take-random-value-from-seq) "Take a random function from LIST and call it a random amount of times. The results will be collected into a list. \(fn LIST)")
+(defalias 'generate-call-random-function-random-times (-compose #'generate-call-function-random-times #'generate-seq-take-random-value-from-seq) "Take a random function from LIST and call it a random amount of times.
+The results will be collected into a list.
+
+\(fn LIST)")
 #+end_src
-** generate-apply-random-function-to-single-arg
+*** generate-apply-random-function-to-single-arg
 #+begin_src emacs-lisp :tangle yes
 (defun generate-apply-random-function-to-single-arg (list args)
   "Take a random function from LIST and apply it on ARGS.
+
 \(fn LIST LIST)"
   (funcall (-compose (lambda (func) (apply func args)) #'generate-seq-take-random-value-from-seq) list))
 #+end_src
-** generate-apply-random-function-to-rest-args
+*** generate-apply-random-function-to-rest-args
 #+begin_src emacs-lisp :tangle yes
 (defun generate-apply-random-function-to-rest-args (list &rest args)
   "Take a random function from LIST and funcall it with ARGS.
+
 \(fn LIST LIST)"
   (funcall (-compose (lambda (func) (apply func args)) #'generate-seq-take-random-value-from-seq) list))
 #+end_src
-** generate-call-n-random-functions
+*** generate-call-n-random-functions
 #+begin_src emacs-lisp :tangle yes
 (defun generate-call-n-random-functions (n funcs)
-  "Take N random FUNCS from LIST and call them.
-\(fn INTEGER LIST)"
-  (funcall (-compose (-partial #'-map #'funcall) (-partial #'-take n) #'generate-shuffle-list) funcs))
+  "Take N random FUNCS from LIST and call them."
+  (funcall (-compose (apply-partially #'-map #'funcall) (apply-partially #'-take n) #'generate-shuffle-list) funcs))
 #+end_src
-** generate-random-cl-constantly
+*** generate-random-cl-constantly
 - [[id:060f401a-0f91-493d-9d70-25bbf5325825][just]]
 #+begin_src emacs-lisp :tangle yes
-(defalias 'generate-random-cl-constantly (-compose (-juxt #'cl-constantly #'identity) #'number-to-string #'random) "Returns a random cl-constantly and the value that it will return when called.")
+(defalias 'generate-random-cl-constantly (-compose (-juxt #'cl-constantly #'identity) #'number-to-string #'generate--random-nat-number) "Returns a random cl-constantly and the value that it will return when called.")
 #+end_src
-** generate-list-of-test-cl-constantlys
+*** generate-default-convert-n-gen-to-random
+#+begin_src elisp :tangle yes
+(defun generate-default-convert-n-gen-to-random (generator-function)
+  "Converts a GENERATOR-FUNCTION into a random generator.
+GENERATOR-FUNCTION should only take one argument, N, the number of values
+that will be generated."
+  (-compose generator-function #'generate--random-nat-number-in-range-1-to-25))
+#+end_src
+*** generate-default-convert-n-gen-to-random-with-arg
+#+begin_src elisp :tangle yes
+(defalias 'generate-default-convert-n-gen-to-random-with-arg (generate--convert-n-gen-to-random-with-arg #'generate--random-nat-number-in-range-1-to-25)
+    "Converts a GENERATOR-FUNCTION into a random generator.
+GENERATOR-FUNCTION should only take two arguments.
+The first argument should correspond to the the number of values
+that will be generated. The second argument can be anything.")
+#+end_src
+** ranges
+*** generate-nat-number-range
 #+begin_src emacs-lisp :tangle yes
-(defalias 'generate-random-list-of-cl-constantlys (-compose (-juxt #'identity #'generate--seq-map-cl-constantly) #'generate--random-nat-number-list-in-range-255) "Returns a list of random cl-constantlys and the values that each cl-constantly will return when called.")
+(defun generate-nat-number-range (size)
+  "Returns a random n SIZE range.
+
+\(fn INTEGER)"
+  (funcall (-juxt #'identity (apply-partially #'+ size))
+         (generate--random-nat-number)))
 #+end_src
-* seq
-** extensions
-*** generate-seq-shuffle
-**** base implementation
+*** generate-random-nat-number-range
+#+begin_src elisp :tangle yes
+(defalias 'generate-random-nat-number-range (generate-default-convert-n-gen-to-random #'generate-nat-number-range))
+#+end_src
+** seq
+*** extensions
+**** generate-seq-take-random-value
+#+begin_src emacs-lisp :tangle yes
+(defalias 'generate-seq-take-random-value (-compose #'generate--seq-take-one #'generate-seq-shuffle) "Returns a list with one random value from SEQ.
+
+\(fn SEQ)")
+#+end_src
+**** generate-seq-take-random-value-from-seq
+- [[id:8b7cb5e7-b613-4429-bae9-a7272c0d498f][alist of nat-numbers]]
+#+begin_src emacs-lisp :tangle yes
+(defalias 'generate-seq-take-random-value-from-seq (-compose #'seq-first #'generate-seq-take-random-value) "Returns one random value from SEQ.
+
+\(fn SEQ)")
+#+end_src
+**** generate-seq-two-random-values
+#+begin_src emacs-lisp :tangle yes
+(defalias 'generate-seq-two-random-values (-compose #'generate--seq-take-two #'generate-seq-shuffle) "Returns a list with two random values from SEQ.
+
+\(fn SEQ)")
+#+end_src
+**** generate-seq-random-chunk-length
+#+begin_src emacs-lisp :tangle yes
+(defun generate--seq-random-chunk-length (seq)
+  "Returns a random chunk length for SEQ.
+The value is guaranteed to be greater than
+or equal to 1 and less than the length of SEQ."
+  (let ((max-length (max 1 (floor (seq-length seq) 2))))
+    (if (equal max-length 1) 1 (generate--random-nat-number-between-1-and max-length))))
+#+end_src
+**** generate-seq-random-chunk-of-size-n
+#+begin_src emacs-lisp :tangle yes
+(defun generate-seq-random-chunk-of-size-n (chunk-length seq)
+  "Returns a random chunk of size CHUNK-LENGTH from SEQ."
+  (let* ((chunks (seq-split seq chunk-length))
+     (correct-chunks (seq-filter (-rpartial #'length= chunk-length) chunks)))
+    (generate-seq-take-random-value-from-seq correct-chunks)))
+#+end_src
+**** generate-seq-random-chunk
+#+begin_src emacs-lisp :tangle yes
+(defalias 'generate-seq-random-chunk (-compose #'generate--applify-seq-random-chunk-of-size-n (-juxt #'generate--seq-random-chunk-length #'identity)) "Returns a random chunk of from SEQ.
+
+The length of chunk will be greater than or equal to 1
+and less than the length of SEQ.
+
+\(fn SEQ)")
+#+end_src
+**** generate-seq-random-position
+#+begin_src emacs-lisp :tangle yes
+(defalias 'generate-seq-random-position (-compose #'generate--random-nat-number-between-0-and #'seq-length) "Returns a random position from SEQ.
+
+\(fn SEQ)")
+#+end_src
+**** generate-seq-split-random
+#+begin_src emacs-lisp :tangle yes
+(defalias 'generate-seq-split-random (-compose #'generate--applify-seq-split (-juxt #'identity #'generate--seq-random-chunk-length)) "Splits a SEQ into random chunks of random size.
+
+\(fn SEQ)")
+#+end_src
+**** generate-seq-n-random-values
+#+begin_src emacs-lisp :tangle yes
+(defun generate-seq-n-random-values (n seq)
+  "Returns N random values from SEQ."
+  (funcall (-compose (-rpartial #'seq-take n) #'generate-seq-shuffle) seq))
+#+end_src
+**** generate-seq-random-values
+#+begin_src emacs-lisp :tangle yes
+(defun generate-seq-random-values (seq)
+  "Returns a random number of values from SEQ."
+  (funcall (-compose (-rpartial #'generate-seq-n-random-values seq) #'generate--seq-random-chunk-length) seq))
+#+end_src
+**** generate-seq-random-value-with-position
+#+begin_src emacs-lisp :tangle yes
+(defalias 'generate-seq-random-value-with-position (-compose (-juxt #'generate--applify-seq-elt-flipped #'seq-first) (-juxt #'generate-seq-random-position #'identity)) "Returns a random item with its position from SEQ.
+
+\(fn SEQ)")
+#+end_src
+**** generate-seq-take-infinite
+***** base
+#+begin_src elisp :tangle yes
+(cl-defgeneric generate-seq-take-infinite (n seq)
+  "Take N values from SEQ.
+When n is larger than the length of SEQ, we loop back around."
+  (funcall (-compose (-rpartial #'seq-take n) #'-cycle) seq))
+#+end_src
+***** vector
+#+begin_src elisp :tangle yes
+(cl-defmethod generate-seq-take-infinite (n (seq vector))
+    "Take N values from SEQ.
+When n is larger than the length of SEQ, we loop back around."
+  (funcall (-compose #'seq--into-vector (-rpartial #'seq-take n) #'-cycle) seq))
+#+end_src
+***** string
+#+begin_src elisp :tangle yes
+(cl-defmethod generate-seq-take-infinite (n (seq string))
+      "Take N values from SEQ.
+When n is larger than the length of SEQ, we loop back around."
+  (funcall (-compose #'seq--into-string (-rpartial #'seq-take n) #'-cycle) seq))
+#+end_src
+**** generate-seq-shuffle
+***** base implementation
 #+begin_src emacs-lisp :tangle yes
 (cl-defgeneric generate-seq-shuffle (seq)
-  "Returns a shuffled SEQ.
-Base implementation use generate-shuffle-list."
+  "Returns a shuffled SEQ."
   (generate-shuffle-list seq))
 #+end_src
-**** for vectors
+***** for vectors
 #+begin_src emacs-lisp :tangle yes
 (cl-defmethod generate-seq-shuffle ((seq vector))
   "Returns a shuffled SEQ (vector)."
   (funcall (-compose #'seq--into-vector #'generate-shuffle-list #'seq--into-list) seq))
 #+end_src
-**** for strings
+***** for strings
 #+begin_src emacs-lisp :tangle yes
 (cl-defmethod generate-seq-shuffle ((seq string))
   "Returns a shuffled SEQ (string)."
    (funcall (-compose #'seq--into-string #'generate-shuffle-list #'seq--into-list) seq))
 #+end_src
-*** generate-seq-take-random-value
-#+begin_src emacs-lisp :tangle yes
-(defalias 'generate-seq-take-random-value (-compose #'generate--seq-take-one #'generate-seq-shuffle) "Returns a list with one random value from SEQ. \(fn SEQ)")
+**** generate-seq-subseq-infinite
+#+begin_src elisp :tangle yes
+(defun generate-seq-subseq-infinite (seq start end)
+  "Return the elements of SEQ from START to END.
+END is exclusive.  If END is omitted,
+it defaults to the length of the sequence.
+If START or END is negative, we counts from the end.
+If END is greater than the length of the list,
+we wrap back around."
+  (cond
+    ((or (cl-minusp start) (cl-minusp end))
+        (error "Positions can not be negative"))
+    ((> start end)
+        (error "Start can not be greater than end"))
+    (t
+        (let* ((length (seq-length seq)))
+         (if (> end length)
+           (funcall (-compose (-rpartial #'seq-subseq start end) (-rpartial #'generate-seq-take-infinite seq) (apply-partially #'+ length) (apply-partially #'- end)) length)
+           (seq-subseq seq start end))))))
 #+end_src
-*** generate-seq-take-random-value-from-seq
-- [[id:8b7cb5e7-b613-4429-bae9-a7272c0d498f][alist of nat-numbers]]
-#+begin_src emacs-lisp :tangle yes
-(defalias 'generate-seq-take-random-value-from-seq (-compose #'seq-first #'generate-seq-take-random-value) "Returns one random value from SEQ. \(fn SEQ)")
+**** generate-seq-n-random-infinite-subseqs
+#+begin_src elisp :tangle yes
+(defun generate-seq-n-random-infinite-subseqs (n seq)
+  "Returns N random subseqs from SEQ.
+The length of the subseqs from may be longer
+than the length of SEQ."
+  (let* ((lengths (generate-data :exact-length n :item-transformer (apply-partially #'generate--non-zero-bounded-modular-addition generate--FIVERANGE 1)))
+         (sum-of-lengths (-sum lengths))
+         (lengths-butlast (generate--seq-butlast lengths))
+         (sum-of-lengths-butlast (-sum lengths))
+         (seq-to-slice-length (seq-length seq))
+         (slice-lengths (if (< sum-of-lengths seq-to-slice-length) (append lengths-butlast (list (- seq-to-slice-length sum-of-lengths-butlast))) lengths))
+         (slice-ends (or (generate--seq-cdr (-running-sum slice-lengths))))
+         (first-slice-end (seq-first slice-ends))
+         (initial-value (list (list (generate-seq-subseq-infinite seq 0 first-slice-end)) first-slice-end)))
+    (seq-first (seq-reduce (apply-partially #'generate--seq-n-random-subseqs-reducer seq) slice-ends initial-value))))
 #+end_src
-*** generate-seq-two-random-values
-#+begin_src emacs-lisp :tangle yes
-(defalias 'generate-seq-two-random-values (-compose #'generate--seq-take-two #'generate-seq-shuffle) "Returns a list with two random values from SEQ. \(fn SEQ)")
+**** generate-seq-split-infinite
+#+begin_src elisp :tangle yes
+(defun generate-seq-split-infinite (length seq)
+    "Split SEQ into a list of sub-sequences.
+LENGTH will be the length of each sub-sequence.
+If LENGTH is greater than the actual length
+of the list, we wrap back around."
+  (let* ((start-index (1- (seq-length seq)))
+         (seq-to-reduce (generate--seq-butlast seq))
+         (initial-value (generate-seq-subseq-infinite seq (* start-index length) (* (1+ start-index) length))))
+    (generate--seq-reduce-right-indexed
+     (lambda (_ acc index)
+       (append (list (generate-seq-subseq-infinite seq (* index length) (* (1+ index) length))) acc))
+    seq-to-reduce
+    (list initial-value))))
 #+end_src
-*** generate-seq-random-chunk-length
-#+begin_src emacs-lisp :tangle yes
-(defun generate--seq-random-chunk-length (seq)
-  "Returns a random chunk length that is greater than or equal to 1 and less than the length of SEQ."
-  (let ((max-length (max 1 (floor (seq-length seq) 2))))
-    (if (equal max-length 1) 1 (generate--random-nat-number-between-1-and max-length))))
+**** generate-seq-n-random-chunks-of-size-x
+#+begin_src elisp :tangle yes
+(defun generate-seq-n-random-chunks-of-size-x (length n seq)
+  "Returns N random chunks from SEQ.
+Each chunk will be LENGTH long."
+  (funcall (-compose (apply-partially #'generate-seq-take-infinite n) #'generate-seq-shuffle #'generate-seq-split-infinite) length seq))
 #+end_src
-*** generate-seq-random-chunk-of-size-n
-#+begin_src emacs-lisp :tangle yes
-(defun generate-seq-random-chunk-of-size-n (chunk-length seq)
-  "Returns a random chunk of size CHUNK-LENGTH from SEQ.
-\(fn INTEGER SEQ)"
-  (let* ((chunks (seq-split seq chunk-length))
-     (correct-chunks (seq-filter (-rpartial #'length= chunk-length) chunks)))
-    (generate-seq-take-random-value-from-seq correct-chunks)))
-
-(defalias 'generate--applify-seq-random-chunk-of-size-n (-applify #'generate-seq-random-chunk-of-size-n) "Returns a random chunk of size CHUNK-LENGTH from SEQ. This function takes a 1 argument instead of 2.")
+**** generate-seq-take-infinite-shuffled
+#+begin_src elisp :tangle yes
+(defalias 'generate-seq-take-infinite-shuffled (-compose #'generate-seq-shuffle #'generate-seq-take-infinite))
 #+end_src
-*** generate-seq-random-chunk
-#+begin_src emacs-lisp :tangle yes
-(defalias 'generate-seq-random-chunk (-compose #'generate--applify-seq-random-chunk-of-size-n (-juxt #'generate--seq-random-chunk-length #'identity)) "Returns a random chunk of from SEQ whose length is greater than or equal to 1 and less than the length of SEQ. \(fn SEQ)")
+**** generate-seq-n-random-chunks-of-random-size
+#+begin_src elisp :tangle yes
+(defun generate-seq-n-random-chunks-of-random-size (n seq)
+  "Returns N random chunks from SEQ."
+  (funcall (-compose (-rpartial #'generate-seq-n-random-chunks-of-size-x n seq) #'generate--seq-random-chunk-length) seq))
 #+end_src
-*** generate-seq-random-position
+** map
+** generate-data
 #+begin_src emacs-lisp :tangle yes
-(defalias 'generate-seq-random-position (-compose #'generate--random-nat-number-between-0-and #'seq-length) "Returns a random position from SEQ. \(fn SEQ)")
+(cl-defun generate-data (&key (item-transformer #'identity) (list-transformer #'generate-shuffle-list)
+                              min-length max-length exact-length)
+  "Return a random list.
+The length of the list can be optionally specified
+using :MIN-LENGTH and :MAX-LENGTH or simply :EXACT-LENGTH.
+If EXACT-LENGTH and MIN-LENGTH or MAX-LENGTH are used together,
+an error will be signaled.  :ITEM-TRANSFORMER must be a unary
+function.  The function will called on each number
+in the random list.  :LIST-TRANSFORMER will be called
+with the random list as its only argument.
+:LIST-TRANSFORMER will always been called after :ITEM-TRANSFORMER
+has transformed each item of the list."
+  (when (and min-length max-length (> min-length max-length))
+    (error "Min-length must be less than max-length"))
+  (when (and exact-length min-length)
+    (error "Exact-length and min-length can not be used together"))
+  (when (and exact-length max-length)
+    (error "Exact-length and max-length can not be used together"))
+  (let* ((min-items (or exact-length min-length 1))
+         (max-items (or exact-length max-length 50))
+         (range-length (generate-random-nat-number-in-range (list min-items max-items)))
+         (list-items (generate--random-nat-number-list range-length)))
+    (funcall (-on list-transformer (apply-partially #'mapcar item-transformer)) list-items)))
 #+end_src
-*** generate-seq-split-random
-#+begin_src emacs-lisp :tangle yes
-(defalias 'generate-seq-split-random (-compose #'generate--applify-seq-split (-juxt #'identity #'generate--seq-random-chunk-length)) "Splits a SEQ into random chunks of random size. \(fn SEQ)")
-#+end_src
-*** generate-seq-n-random-values
-#+begin_src emacs-lisp :tangle yes
-(defun generate-seq-n-random-values (n seq)
-  "Returns N random values from SEQ.
-\(fn INTEGER SEQ)"
-  (funcall (-compose (-rpartial #'seq-take n) #'generate-seq-shuffle) seq))
-#+end_src
-*** generate-seq-random-values
-#+begin_src emacs-lisp :tangle yes
-(defun generate-seq-random-values (seq)
-  "Returns a random number of values from SEQ.
-\(fn SEQ)"
-  (funcall (-compose (-rpartial #'generate-seq-n-random-values seq) #'generate--seq-random-chunk-length) seq))
-#+end_src
-*** generate-seq-random-value-with-position
-#+begin_src emacs-lisp :tangle yes
-(defalias 'generate-seq-random-value-with-position (-compose (-juxt #'generate--applify-seq-elt-flipped #'seq-first) (-juxt #'generate-seq-random-position #'identity)) "Returns a random item with its position from SEQ. \(fn SEQ)")
-#+end_src
-* map
-** extensions
-*** generate-map-random-key
-#+begin_src emacs-lisp :tangle yes
-(defalias 'generate-map-random-key (-compose #'generate-seq-take-random-value-from-seq #'map-keys) "Returns one random key from MAP. \(fn MAP)")
-(defalias 'generate-seq-map-random-map-key (-partial #'seq-map #'generate-map-random-key) "Returns one random key from each map in SEQ. \(fn MAP)")
-#+end_src
-*** generate-map-random-value
-#+begin_src emacs-lisp :tangle yes
-(defalias 'generate-map-random-value (-compose #'generate--applify-map-elt (-juxt #'identity #'generate-map-random-key)) "Returns one random value from MAP. \(fn MAP)")
-#+end_src
-*** generate-map-on
-#+begin_src emacs-lisp :tangle yes
-(defun generate--map-on (op keys-trans values-trans map)
-  "Apply VALUES-TRANS to MAP value, KEYS-TRANS to MAP keys and finally OP to MAP.
-\(fn FUNCTION FUNCTION FUNCTION MAP)"
-   (funcall (-compose op (-juxt (-compose keys-trans #'map-keys) (-compose values-trans #'map-values))) map))
-#+end_src
-* strings
-** generate-n-alpha-string-characters
+** strings
+*** generate-n-alpha-string-characters
 #+begin_src emacs-lisp :tangle yes
 (defun generate-n-alpha-string-characters (character-count)
-  "Returns a random list of alphabetic string characters whose length will be equal to CHARACTER-COUNT.
-\(fn INTEGER)"
+  "Returns a random list of alphabetic string characters.
+The length of the list will be equal
+to CHARACTER-COUNT."
   (generate-data :exact-length character-count :item-transformer #'generate--get-next-lower-alpha-string))
 #+end_src
-** generate-n-length-word
+*** generate-n-length-word
 #+begin_src emacs-lisp :tangle yes
 (defun generate-n-length-word (character-count)
   "Returns a random word whose length will be equal to CHARACTER-COUNT.
 \(fn INTEGER)"
   (generate-data :exact-length character-count :item-transformer #'generate--get-next-lower-alpha-string :list-transformer #'generate--applify-concat))
 #+end_src
-** generate-random-word
+*** generate-random-word
 #+begin_src emacs-lisp :tangle yes
-(defalias 'generate-random-word (-partial #'generate-data :item-transformer #'generate--get-next-lower-alpha-string :list-transformer #'generate--applify-concat :min-length 2) "Returns a random word.")
+(defalias 'generate-random-word (apply-partially #'generate-data :item-transformer #'generate--get-next-lower-alpha-string :list-transformer #'generate--applify-concat :min-length 2) "Returns a random word.")
 #+end_src
-** generate-n-words
+*** generate-random-string
+#+begin_src elisp :tangle yes
+(defalias 'generate-random-string #'generate-random-word
+  "Returns a random string. Alias for `generate-random-word'.")
+#+end_src
+*** generate-list-of-n-words
 #+begin_src emacs-lisp :tangle yes
-(defun generate-n-words (word-count)
+(defun generate-list-of-n-words (word-count)
   "Returns a random list of words.
-The number of lines will be equal to WORD-COUNT.
-\(fn INTEGER)"
-  (-let* (((word-lengths character-count) (funcall (-compose (-juxt #'identity #'-sum) #'generate-shuffle-list #'-iota) word-count (generate-random-nat-number-in-range (list 2 5))))
+The number of words will be equal to WORD-COUNT."
+  (-let* (((word-lengths character-count) (funcall (-compose (-juxt #'identity #'-sum) #'generate-shuffle-list #'-iota) word-count (generate-random-nat-number-in-range (list 3 6))))
        (string-of-characters (generate-n-length-word character-count))
-       (words (generate--n-words-helper word-lengths string-of-characters)))
-    (if (generate--len-gt words word-count) (butlast words) words)))
+       (words (generate--list-of-n-words-helper word-lengths string-of-characters)))
+    (if (length> words word-count) (butlast words) words)))
 #+end_src
-** generate-random-list-of-words
+*** generate-list-of-n-strings
+#+begin_src elisp :tangle yes
+(defalias 'generate-list-of-n-strings #'generate-list-of-n-words
+    "Returns a random list of words.
+The number of words will be equal
+to WORD-COUNT. Alias for `generate-list-of-n-words'.")
+#+end_src
+*** generate-random-list-of-words
 #+begin_src emacs-lisp :tangle yes
-(defalias 'generate-random-list-of-words (-compose #'generate-n-words #'1+ #'generate--random-nat-number-in-range-25) "Returns a random list of words.")
+(defalias 'generate-random-list-of-words (generate-default-convert-n-gen-to-random #'generate-list-of-n-words) "Returns a random list of words.")
 #+end_src
-** generate-n-sentences
+*** generate-random-list-of-strings
+#+begin_src elisp :tangle yes
+(defalias 'generate-random-list-of-strings #'generate-random-list-of-words
+  "Returns a random list of words.
+Alias for `generate-random-list-of-words'.")
+#+end_src
+*** generate-random-sentence
+#+begin_src elisp :tangle yes
+(defun generate-random-sentence ()
+  "Returns a random sentence."
+  (concat (s-join " " (generate-random-list-of-words)) "."))
+#+end_src
+*** generate-random-list-of-unique-strings
+#+begin_src elisp :tangle yes
+(defalias 'generate-random-list-of-unique-strings (-compose #'-uniq #'generate-random-list-of-words)
+  "Returns a random list of strings.
+Each string is guranteed to be unique.")
+#+end_src
+*** generate--list-of-n-sentences-base
 #+begin_src emacs-lisp :tangle yes
 
-(defun generate-n-sentences (sentence-count &optional extra-generators)
-      "Returns a random list of sentences.
+(defun generate--list-of-n-sentences-base (sentence-count &optional extra-generators)
+      "Returns a list of sentences.
 The number of lines will be equal to SENTENCE-COUNT.
 The keyword :EXTRA-GENERATORS takes a list.
 Each generator must take no arguments and a return a string.
 Each generator will be called a random number of times."
   (-let* ((multiple (generate-random-nat-number-in-range (list 3 10)))
       (word-count (* multiple sentence-count))
-      (list-of-regular-words (generate-n-words word-count))
+      (list-of-regular-words (generate-list-of-n-words word-count))
       (list-of-words-from-gens (-flatten-n 1 (generate-call-each-function-random-times extra-generators)))
-      ((sentence-slices all-words) (funcall (-compose (-juxt (-compose (-partial #'take sentence-count) (-rpartial #'seq-split multiple)) #'identity) #'generate-shuffle-list #'append) list-of-regular-words list-of-words-from-gens))
-      (sentences (seq-map (-compose (-rpartial #'concat ".") (-partial #'s-join " ")) sentence-slices)))
+      ((sentence-slices all-words) (funcall (-compose (-juxt (-compose (apply-partially #'take sentence-count) (-rpartial #'seq-split multiple)) #'identity) #'generate-shuffle-list #'append) list-of-regular-words list-of-words-from-gens))
+      (sentences (seq-map (-compose (-rpartial #'concat ".") (apply-partially #'s-join " ")) sentence-slices)))
     (list sentences all-words list-of-regular-words list-of-words-from-gens)))
 #+end_src
-** generate-random-list-of-sentences
+*** generate-list-of-n-sentences
+#+begin_src emacs-lisp :tangle yes
+(defun generate-list-of-n-sentences (n)
+  "Returns a list of N sentences."
+  (funcall (-compose #'car #'generate--list-of-n-sentences-base) n))
+#+end_src
+*** generate--random-list-of-sentences-base
+#+begin_src emacs-lisp :tangle yes
+(defun generate--random-list-of-sentences-base ()
+  "Returns a random list of sentences."
+  (generate--list-of-n-sentences-base (generate-random-nat-number-in-range (list 3 5))))
+#+end_src
+*** generate-random-list-of-sentences
 #+begin_src emacs-lisp :tangle yes
 (defun generate-random-list-of-sentences ()
   "Returns a random list of sentences."
-  (generate-n-sentences (generate-random-nat-number-in-range (list 3 5))))
+  (funcall (-compose #'car #'generate--random-list-of-sentences-base)))
 #+end_src
-** generate-string-with-n-lines
+*** generate--string-with-n-lines
 #+begin_src emacs-lisp :tangle yes
-(defun generate-string-with-n-lines (line-count &optional extra-generators)
-  "Returns a string that is formed by a random list of sentences that are joined on new-lines.
-The number of lines will be equal to LINE-COUNT.
-  The keyword :EXTRA-GENERATORS takes a list.
-Each generator must take no arguments and a return a string.
-Each generator will be called a random number of times."
-  (-let* (((list-of-sentences list-of-all-words list-of-alpha-words list-of-words-from-gens) (generate-n-sentences line-count extra-generators)))
+(defun generate--string-with-n-lines-base (line-count &optional extra-generators)
+  "Returns a multiline string.
+The string is formed by a joining a random list of sentences
+on new-lines.  The number of lines
+will be equal to LINE-COUNT.  The keyword
+:EXTRA-GENERATORS takes a list of functions.
+Each function must take no arguments and a
+return a string.  Each generator will be called
+a random number of times."
+  (-let* (((list-of-sentences list-of-all-words list-of-alpha-words list-of-words-from-gens) (generate--list-of-n-sentences-base line-count extra-generators)))
     (list (s-join "\n" list-of-sentences) list-of-sentences list-of-all-words list-of-alpha-words list-of-words-from-gens)))
 #+end_src
-** generate-random-multiline-string
+*** generate-string-with-n-lines
 #+begin_src emacs-lisp :tangle yes
-(defun generate-random-multiline-string (&optional extra-generators)
-  "Returns a string that is formed by a random list of sentences that are joined on new-lines.
-The keyword :EXTRA-GENERATORS takes a list.
-Each generator must take no arguments and a return a string.
-Each generator will be called a random number of times."
-  (generate-string-with-n-lines (generate-random-nat-number-in-range (list 2 5)) extra-generators))
+(defun generate-string-with-n-lines (n)
+  "Returns a string with N lines."
+  (funcall (-compose #'car #'generate--string-with-n-lines-base) n))
 #+end_src
-* lists
+*** generate--random-multiline-string-base
 #+begin_src emacs-lisp :tangle yes
+(defun generate--random-multiline-string-base (&optional extra-generators)
+  "Returns a multiline string.
+The string is formed by a joining
+a random list of sentences on new-lines.
+The keyword :EXTRA-GENERATORS takes a
+list of functions.  Each function must
+take no arguments and a return a string.
+Each generator will be called
+a random number of times."
+  (generate--string-with-n-lines-base (generate-random-nat-number-in-range (list 2 5)) extra-generators))
+#+end_src
+*** generate-random-multiline-string
+#+begin_src emacs-lisp :tangle yes
+(defalias 'generate-random-multiline-string (-compose #'car #'generate--random-multiline-string-base)  "Returns a random string.
+The string is guranteed to have multiple lines.")
+#+end_src
+** lists
+#+begin_src emacs-lisp :tangle yes
+(defalias 'generate-list-of-nat-numbers #'generate-data "Returns a random list of natural numbers.
+The length of the list can be optionally
+specified using :MIN-LENGTH and
+:MAX-LENGTH or simply :EXACT-LENGTH.
 
-(defalias 'generate-list-of-nat-numbers #'generate-data "Returns a random list of natural numbers. The length of the list can be optionally specified using :MIN-LENGTH and :MAX-LENGTH or simply :EXACT-LENGTH. \(fn [:max-length INTEGER] [:min-length INTEGER] [:exact-length INTEGER])")
-(defalias 'generate-list-of-nat-number-strings (-partial #'generate-data :item-transformer #'number-to-string) "Returns a random list of strings where each string is a natural numbers. The length of the list can be optionally specified using :MIN-LENGTH and :MAX-LENGTH or simply :EXACT-LENGTH. \(fn [:max-length INTEGER] [:min-length INTEGER] [:exact-length INTEGER])")
-(defalias 'generate-list-of-floats-between-0-and-1 (-partial #'generate-data :list-transformer (-compose #'generate--divide-list-values-by-max-list-value #'generate-seq-shuffle)) "Returns a random list of floats where each float is greater than or equal to zero and less than 1. The length of the list can be optionally specified using :MIN-LENGTH and :MAX-LENGTH or simply :EXACT-LENGTH. \(fn [:max-length INTEGER] [:min-length INTEGER] [:exact-length INTEGER])")
-(defalias 'generate-list-of-floats (-partial #'generate-data :list-transformer (-compose #'generate--divide-list-values-by-random-value #'generate-seq-shuffle)) "Returns a random list of floats. The length of the list can be optionally specified using :MIN-LENGTH and :MAX-LENGTH or simply :EXACT-LENGTH. \(fn [:max-length INTEGER] [:min-length INTEGER] [:exact-length INTEGER])")
-(defalias 'generate-random-list-of-strings (-partial #'generate-data :min-length 50 :item-transformer #'generate--get-next-lower-alpha-character :list-transformer (-compose #'generate-seq-split-random #'seq--into-string)) "Returns a random list of strings.")
-(defalias 'generate-random-list-of-lists-nat-numbers (-partial #'generate-data :list-transformer #'generate-seq-split-random) "Returns a random list of lists of natural numbers.")
+\(fn [:max-length INTEGER] [:min-length INTEGER] [:exact-length INTEGER])")
+
+(defalias 'generate-list-of-nat-number-strings (apply-partially #'generate-data :item-transformer #'number-to-string) "Returns a random list of strings.
+Each string will be a natural number.
+The length of the list can be optionally
+specified using :MIN-LENGTH and
+:MAX-LENGTH or simply :EXACT-LENGTH.
+
+\(fn [:max-length INTEGER] [:min-length INTEGER] [:exact-length INTEGER])")
+
+(defalias 'generate-list-of-floats-between-0-and-1 (apply-partially #'generate-data :list-transformer (-compose #'generate--divide-list-values-by-max-list-value #'generate-seq-shuffle)) "Returns a random list of floats.
+Each float will be greater than or equal to
+zero and less than 1.  The length of the list
+can be optionally specified using :MIN-LENGTH
+and :MAX-LENGTH or simply :EXACT-LENGTH.
+
+\(fn [:max-length INTEGER] [:min-length INTEGER] [:exact-length INTEGER])")
+
+(defalias 'generate-list-of-floats (apply-partially #'generate-data :list-transformer (-compose #'generate--divide-list-values-by-random-value #'generate-seq-shuffle)) "Returns a random list of floats.
+The length of the list can be optionally
+specified using :MIN-LENGTH and :MAX-LENGTH
+or simply :EXACT-LENGTH.
+
+\(fn [:max-length INTEGER] [:min-length INTEGER] [:exact-length INTEGER])")
+
+(defalias 'generate-random-list-of-lists-nat-numbers (apply-partially #'generate-data :list-transformer #'generate-seq-split-random) "Returns a random list of lists of natural numbers.")
 #+end_src
-* vectors
+*** generate-list-of-nat-numbers-in-range
+#+begin_src elisp :tangle yes
+(cl-defun generate-list-of-nat-numbers-in-range (range &key (list-transformer #'generate-shuffle-list) min-length max-length exact-length)
+    "Returns a list with COUNT numbers.
+Each number will be within the bounds of RANGE.
+LIST-TRANSFORMER can be used to transform the
+list itself.  MIN-LENGTH, MAX-LENGTH and EXACT-LENGTH
+can be used to control the size of the list.  If
+EXACT-LENGTH and MIN-LENGTH or MAX-LENGTH
+are used together, an error will be signaled."
+  (generate-data :list-transformer list-transformer
+                 :item-transformer (apply-partially #'generate--non-zero-bounded-modular-addition range 0)
+                 :exact-length exact-length
+                 :min-length min-length
+                 :max-length max-length))
+#+end_src
+**** Aliases
+***** generate--list-of-n-nat-numbers-in-range-5
+#+begin_src elisp :tangle yes
+(defalias 'generate--list-of-n-nat-numbers-in-range-5 (apply-partially #'generate-list-of-nat-numbers-in-range generate--FIVERANGE))
+#+end_src
+***** generate--list-of-n-nat-numbers-in-range-10
+#+begin_src elisp :tangle yes
+(defalias 'generate--list-of-n-nat-numbers-in-range-10 (apply-partially #'generate-list-of-nat-numbers-in-range generate--TENRANGE))
+#+end_src
+***** generate--list-of-nat-numbers-in-range-25
+#+begin_src elisp :tangle yes
+(defalias 'generate--list-of-nat-numbers-in-range-25 (apply-partially #'generate-list-of-nat-numbers-in-range generate--ONETOTWENTYFIVE))
+#+end_src
+*** generate-list-of-n-random-values
+#+begin_src elisp :tangle yes
+(defalias 'generate-list-of-n-random-values (generate--list-of-n-random-values generate--LIST-ITEM-TRANSFORMERS))
+#+end_src
+** vectors
 #+begin_src emacs-lisp :tangle yes
-(defalias 'generate-vector-of-nat-numbers (-compose #'generate--applify-vector #'generate-list-of-nat-numbers) "Returns a random vector of natural numbers. The length of the vector can be optionally specified using :MIN-LENGTH and :MAX-LENGTH or simply :EXACT-LENGTH. \(fn [:max-length INTEGER] [:min-length INTEGER] [:exact-length INTEGER])")
-(defalias 'generate-vector-of-floats-between-0-and-1 (-compose #'generate--applify-vector #'generate-list-of-floats-between-0-and-1) "Returns a random vector of floats where each float is greater than or equal to zero and less than 1. The length of the vector can be optionally specified using :MIN-LENGTH and :MAX-LENGTH or simply :EXACT-LENGTH. \(fn [:max-length INTEGER] [:min-length INTEGER] [:exact-length INTEGER])")
-(defalias 'generate-vector-of-floats (-compose #'generate--applify-vector #'generate-list-of-floats) "Returns a random vector of floats. The length of the vector can be optionally specified using :MIN-LENGTH and :MAX-LENGTH or simply :EXACT-LENGTH. \(fn [:max-length INTEGER] [:min-length INTEGER] [:exact-length INTEGER])")
+(defalias 'generate-vector-of-n-nat-numbers (-compose #'generate--applify-vector #'generate-list-of-nat-numbers) "Returns a random vector of natural numbers.
+The length of the vector can be optionally
+specified using :MIN-LENGTH and :MAX-LENGTH
+or simply :EXACT-LENGTH.
+
+\(fn [:max-length INTEGER] [:min-length INTEGER] [:exact-length INTEGER])")
+
+(defalias 'generate-vector-of-floats-between-0-and-1 (-compose #'generate--applify-vector #'generate-list-of-floats-between-0-and-1) "Returns a random vector of floats.
+Each float will be greater than or equal to zero and less than 1.
+The length of the vector can be optionally
+specified using :MIN-LENGTH and :MAX-LENGTH
+or simply :EXACT-LENGTH.
+\(fn [:max-length INTEGER] [:min-length INTEGER] [:exact-length INTEGER])")
+
+(defalias 'generate-vector-of-floats (-compose #'generate--applify-vector #'generate-list-of-floats) "Returns a random vector of floats.
+The length of the vector can be optionally specified
+using :MIN-LENGTH and :MAX-LENGTH
+or simply :EXACT-LENGTH.
+
+\(fn [:max-length INTEGER] [:min-length INTEGER] [:exact-length INTEGER])")
+
 (defalias 'generate-random-vector-of-strings (-compose #'generate--applify-vector #'generate-random-list-of-strings) "Returns a random vector of strings.")
-(defalias 'generate-random-vector-of-lists-nat-numbers (-partial #'generate-data :list-transformer (-compose #'generate--applify-vector #'generate-seq-split-random)) "Returns a random vector of lists of natural numbers.")
+
+(defalias 'generate-random-vector-of-lists-nat-numbers (apply-partially #'generate-data :list-transformer (-compose #'generate--applify-vector #'generate-seq-split-random)) "Returns a random vector of lists of natural numbers.")
+
 (defalias 'generate-random-vector-of-vectors-nat-numbers (-compose #'generate--seq-map-vector #'generate-random-vector-of-lists-nat-numbers) "Returns a random vector of vectors of natural numbers.")
 #+end_src
-* alists
+** alists - make sure the string generators are correct
 #+begin_src emacs-lisp :tangle yes
 
-(defalias 'generate-random-alist-of-nat-numbers (-partial #'generate-data :list-transformer (-compose #'generate--applify-zip (-juxt #'seq-reverse #'generate-seq-shuffle))) "Returns a random alist were both the keys and the values are natural numbers.")
-(defalias 'generate-random-alist-of-strings (-partial #'generate-data :item-transformer #'char-to-string :list-transformer (-compose #'generate--applify-zip (-juxt #'seq-reverse #'generate-seq-shuffle))) "Returns a random alist were both the keys and the values are strings.")
-(defalias 'generate-random-alist-of-string-nat-number-cons (-partial #'generate-data :list-transformer (-compose #'generate--applify-zip (-juxt (-compose #'generate--seq-map-char-to-string #'seq-reverse) #'generate-seq-shuffle))) "Returns a random alist were both the keys are strings and the values are natural numbers.")
-(defalias 'generate-random-alist-of-nat-number-string-cons (-partial #'generate-data :list-transformer (-compose #'generate--applify-zip (-juxt #'seq-reverse (-compose #'generate--seq-map-char-to-string #'generate-seq-shuffle)))) "Returns a random alist were the keys are natural numbers and the values are strings.")
+(defalias 'generate-random-alist-of-nat-numbers (apply-partially #'generate-data :list-transformer (-compose #'generate--applify-zip (-juxt #'seq-reverse #'generate-seq-shuffle))) "Returns a random alist.
+Both the keys and the values will be natural numbers.")
+
+(defalias 'generate-random-alist-of-strings (apply-partially #'generate-data :item-transformer #'generate--get-next-lower-alpha-string :list-transformer (-compose #'generate--applify-zip (-juxt #'seq-reverse #'generate-seq-shuffle))) "Returns a random alist.
+Both the keys and the values will be strings.")
+
+(defalias 'generate-random-alist-of-string-nat-number-cons (apply-partially #'generate-data :item-transformer #'generate--get-next-lower-alpha-character :list-transformer (-compose #'generate--applify-zip (-juxt (-compose #'generate--seq-map-char-to-string #'seq-reverse) #'generate-seq-shuffle))) "Returns a random alist.
+The keys will be strings and the
+values will be natural numbers.")
+
+(defalias 'generate-random-alist-of-nat-number-string-cons (apply-partially #'generate-data :item-transformer #'generate--get-next-lower-alpha-character :list-transformer (-compose #'generate--applify-zip (-juxt #'seq-reverse (-compose #'generate--seq-map-char-to-string #'generate-seq-shuffle)))) "Returns a random alist.
+The keys will be natural numbers
+and the values will be strings.")
 #+end_src
-* plists
+*** generate-list-of-n-alists
+** plists
 #+begin_src emacs-lisp :tangle yes
+(defalias 'generate-random-plist-of-nat-numbers (-compose #'generate--map-into-plist #'generate-random-alist-of-nat-numbers) "Returns a random plist.
+Both the keys and the values will be natural numbers.")
 
-(defalias 'generate-random-plist-of-nat-numbers (-compose #'generate--map-into-plist #'generate-random-alist-of-nat-numbers) "Returns a random plist were both the keys and the values are natural numbers.")
-(defalias 'generate-random-plist-of-strings (-compose #'generate--map-into-plist #'generate-random-alist-of-strings) "Returns a random plist were both the keys and the values are strings.")
-(defalias 'generate-random-plist-of-string-nat-number-pairs (-compose #'generate--map-into-plist #'generate-random-alist-of-string-nat-number-cons) "Returns a random plist were both the keys are strings and the values are natural numbers.")
-(defalias 'generate-random-plist-of-nat-number-string-pairs (-compose #'generate--map-into-plist #'generate-random-alist-of-nat-number-string-cons) "Returns a random plist were the keys are natural numbers and the values are strings.")
+(defalias 'generate-random-plist-of-strings (-compose #'generate--map-into-plist #'generate-random-alist-of-strings) "Returns a random plist
+Both the keys and the values will be strings.")
+
+(defalias 'generate-random-plist-of-string-nat-number-pairs (-compose #'generate--map-into-plist #'generate-random-alist-of-string-nat-number-cons) "Returns a random plist.
+The keys will be strings and the
+values will be natural numbers.")
+
+(defalias 'generate-random-plist-of-nat-number-string-pairs (-compose #'generate--map-into-plist #'generate-random-alist-of-nat-number-string-cons) "Returns a random plist.
+The keys will be natural numbers
+and the values will be strings.")
 #+end_src
-* hash-table
+** hash-table
 #+begin_src emacs-lisp :tangle yes
+(defalias 'generate-random-hash-table-of-nat-numbers (-compose #'generate--map-into-hash-table #'generate-random-alist-of-nat-numbers) "Returns a random hash-table
+Both the keys and the values will be natural numbers.")
 
-(defalias 'generate-random-hash-table-of-nat-numbers (-compose #'generate--map-into-hash-table #'generate-random-alist-of-nat-numbers) "Returns a random hash-table were both the keys and the values are natural numbers.")
-(defalias 'generate-random-hash-table-of-strings (-compose #'generate--map-into-hash-table #'generate-random-alist-of-strings) "Returns a random hash-table were both the keys and the values are strings.")
-(defalias 'generate-random-hash-table-of-string-nat-number-pairs (-compose #'generate--map-into-hash-table #'generate-random-alist-of-string-nat-number-cons) "Returns a random hash-table were both the keys are strings and the values are natural numbers.")
-(defalias 'generate-random-hash-table-of-nat-number-string-pairs (-compose #'generate--map-into-hash-table #'generate-random-alist-of-nat-number-string-cons) "Returns a random hash-table were the keys are natural numbers and the values are strings.")
+(defalias 'generate-random-hash-table-of-strings (-compose #'generate--map-into-hash-table #'generate-random-alist-of-strings) "Returns a random hash-table.
+Both the keys and the values will be strings.")
+
+(defalias 'generate-random-hash-table-of-string-nat-number-pairs (-compose #'generate--map-into-hash-table #'generate-random-alist-of-string-nat-number-cons) "Returns a random hash-table.
+The keys will be strings and the
+values will be natural numbers.")
+
+(defalias 'generate-random-hash-table-of-nat-number-string-pairs (-compose #'generate--map-into-hash-table #'generate-random-alist-of-nat-number-string-cons) "Returns a random hash-table.
+The keys will be natural numbers
+and the values will be strings.")
 #+end_src
-* cons
+** cons
 #+begin_src emacs-lisp :tangle yes
+(defalias 'generate-random-con-of-nat-numbers (apply-partially #'generate-data :exact-length 2 :list-transformer #'generate--random-con-from-list) "Returns a random cons cell.
+ The car and the cdr will be natural numbers.")
 
-(defalias 'generate-random-con-of-nat-numbers (-partial #'generate-data :exact-length 2 :list-transformer #'generate--random-con-from-list) "Returns a random cons cell where both values are natural numbers.")
-(defalias 'generate-random-con-of-floats (-partial #'generate-data :exact-length 2 :list-transformer (-compose #'generate--random-con-from-list #'generate--divide-list-values-by-max-list-value)) "Returns a random cons cell where both values are floats.")
-(defalias 'generate-random-con-of-strings (-partial #'generate-data :exact-length 2 :item-transformer #'char-to-string :list-transformer #'generate--random-con-from-list) "Returns a random cons cell where both values are strings.")
+(defalias 'generate-random-con-of-floats (apply-partially #'generate-data :exact-length 2 :list-transformer (-compose #'generate--random-con-from-list #'generate--divide-list-values-by-max-list-value)) "Returns a random cons cell.
+The car and the cdr will be floats.")
 
-(defalias 'generate-random-string-nat-number-con (-partial #'generate-data :exact-length 2 :list-transformer (-compose #'generate--applify-cons (-juxt (-compose #'char-to-string #'-first-item) #'-second-item) #'generate-seq-two-random-values)) "Returns a random cons cell where the car is a string and con is natural number.")
-(defalias 'generate-random-nat-number-string-con (-partial #'generate-data :exact-length 2 :list-transformer (-compose #'generate--applify-cons (-juxt #'-first-item (-compose #'char-to-string #'-second-item)) #'generate-seq-two-random-values)) "Returns a random cons cell where the car is a natural number and the cons is a string.")
-(defalias 'generate-random-string-vector-of-nat-numbers-con (-partial #'generate-data :exact-length 2 :list-transformer (-compose #'generate--applify-cons (-juxt (-compose #'char-to-string #'-first-item) (-compose #'generate--applify-vector #'cdr)))) "Returns a random cons cell where the car is a string and the cons is a vector.")
+(defalias 'generate-random-con-of-strings (apply-partially #'generate-data :exact-length 2 :item-transformer #'generate--get-next-lower-alpha-string :list-transformer #'generate--random-con-from-list) "Returns a random cons cell.
+The car and the cdr will be strings.")
+
+(defalias 'generate-random-string-nat-number-con (apply-partially #'generate-data :exact-length 2 :item-transformer #'generate--get-next-lower-alpha-character :list-transformer (-compose #'generate--applify-cons (-juxt (-compose #'char-to-string #'-first-item) #'-second-item) #'generate-seq-two-random-values)) "Returns a random cons cell.
+The car will be string.
+The cdr will be a natural number.")
+
+(defalias 'generate-random-nat-number-string-con (apply-partially #'generate-data :exact-length 2 :item-transformer #'generate--get-next-lower-alpha-character :list-transformer (-compose #'generate--applify-cons (-juxt #'-first-item (-compose #'char-to-string #'-second-item)) #'generate-seq-two-random-values)) "Returns a random cons cell.
+The car will be a natural number
+The cdr will be a string.")
+
+(defalias 'generate-random-string-vector-of-nat-numbers-con (apply-partially #'generate-data :exact-length 2 :item-transformer #'generate--get-next-lower-alpha-character :list-transformer (-compose #'generate--applify-cons (-juxt (-compose #'char-to-string #'-first-item) (-compose #'generate--applify-vector #'cdr)))) "Returns a random cons cell.
+The car will be a string.
+The cdr will b a vector.")
 #+end_src
-* time
-** generate-random-12-hour-time-string
+** symbols
+*** generate-random-symbol
+#+begin_src emacs-lisp :tangle yes
+(defalias 'generate-random-symbol (-compose #'make-symbol #'generate-random-word) "Returns a random symbol.")
+#+end_src
+*** generate-list-of-n-symbols
+#+begin_src elisp :tangle yes
+(defalias 'generate-list-of-n-symbols (-compose (apply-partially #'mapcar #'make-symbol) #'generate-list-of-n-words)  "Returns a list with N symbols.")
+#+end_src
+*** generate-random-list-of-symbols
+#+begin_src elisp :tangle yes
+(defalias 'generate-random-list-of-symbols (-compose (apply-partially #'mapcar #'make-symbol) #'generate-random-list-of-unique-strings) "Returns a random list of symbols.")
+#+end_src
+** booleans
+*** generate-random-boolean
+#+begin_src emacs-lisp :tangle yes
+(defalias 'generate-random-boolean (apply-partially #'generate-seq-take-random-value-from-seq (list 't 'nil))
+  "Returns a random boolean.")
+#+end_src
+*** generate-list-of-n-booleans
+#+begin_src elisp :tangle yes
+(defun generate-list-of-n-booleans (n)
+  "Returns a list with N booleans."
+  (generate-data :item-transformer #'math-oddp :exact-length n))
+#+end_src
+** time
+*** generate-random-12-hour-time-string
 #+begin_src emacs-lisp :tangle yes
 (defun generate-random-12-hour-time-string ()
   "Returns a random time string in 12-hour format."
   (format "%s:%s" (generate--random-nat-number-between-1-and-13) (generate--number-to-padded-string (generate--random-nat-number-between-zero-and-60))))
 #+end_src
-** generate-random-24-hour-time-string
+*** generate-random-24-hour-time-string
 #+begin_src emacs-lisp :tangle yes
 (defun generate-random-24-hour-time-string ()
   "Returns a random time string in 24-hour format."
   (funcall (-compose #'generate--join-time-values #'generate--seq-map-format-pad #'list) (generate--random-nat-number-between-zero-and-24) (generate--random-nat-number-between-zero-and-60)))
 #+end_src
-** generate-random-time-string
+*** generate-random-time-string
 #+begin_src emacs-lisp :tangle yes
-(defalias 'generate-random-time-string (-partial #'generate-call-random-function (list #'generate-random-24-hour-time-string #'generate-random-12-hour-time-string)))
+(defalias 'generate-random-time-string (apply-partially #'generate-call-random-function (list #'generate-random-24-hour-time-string #'generate-random-12-hour-time-string)))
 #+end_src
-* dates
-** generate-random-full-dash-date-string
+*** generate-random-lisp-timestamp
+#+begin_src elisp :tangle yes
+(cl-defun generate-random-lisp-timestamp (&optional (range-size generate-lisp-timestamp-range-size))
+  "Returns a random Lisp timestamp.
+RANGE-SIZE can be used to widen or shrink the range.
+It will be used to create the range of times from
+which the timestamp will be selected.
+Each timestamp will be in the
+\(TICKS . HZ) format."
+  (generate--lisp-timestamp-helper (floor range-size 2) (floor range-size 2)))
+#+end_src
+*** generate-random-lisp-timestamp-range
+#+begin_src elisp :tangle yes
+(cl-defun generate-random-lisp-timestamp-range (&optional (range-size generate-lisp-timestamp-range-size))
+  "Returns a random Lisp timestamp range.
+RANGE-SIZE can be used to widen or shrink the range.
+It will be used to create the range of times from
+which the timestamp will be selected.
+Each timestamp will be in the
+\(TICKS . HZ) format."
+  (generate--lisp-timestamp-range-helper (floor range-size 2) (floor range-size 2)))
+#+end_src
+*** generate-random-lisp-timestamp-range-with-duration
+#+begin_src elisp :tangle yes
+(defalias 'generate-random-lisp-timestamp-range-with-duration (-compose #'generate--lisp-timestamp-range-duration-helper #'generate-random-lisp-timestamp-range))
+#+end_src
+*** generate--list-of-n-lisp-timestamp-ranges-helper
+#+begin_src elisp :tangle yes
+(defun generate--list-of-n-lisp-timestamp-ranges-helper (n minus-bottom PLUS-TOP)
+    (-let* (((min hz range-length) (generate--create-timestamp-range-around-current-time minus-bottom PLUS-TOP))
+            (range-indices (generate-list-of-nat-numbers-in-range (list 0 range-length) :exact-length (* n 2)))
+            (timestamps (generate--timestamp-range-indices-to-timestamps hz min range-indices))
+            (raw-ranges (-partition 2 timestamps)))
+      (mapcar (-rpartial #'sort :key #'car) raw-ranges)))
+#+end_src
+*** generate-list-of-n-lisp-timestamp-ranges
+#+begin_src elisp :tangle yes
+(cl-defun generate-list-of-n-lisp-timestamp-ranges (n &optional (range-size generate--SECONDS-IN-AN-HOUR))
+  "Returns N Lisp timestamp ranges.
+RANGE-SIZE can be used to widen or shrink the range.
+Timestamps will be in the (TICKS . HZ) format."
+  (generate--list-of-n-lisp-timestamp-ranges-helper n (floor range-size 2) (floor range-size 2)))
+#+end_src
+*** generate--list-of-n-unzipped-starts-ends-durations
+#+begin_src elisp :tangle yes
+(defalias 'generate--list-of-n-unzipped-starts-ends-durations (-compose #'-unzip-lists (apply-partially #'mapcar #'generate--lisp-timestamp-range-duration-helper) #'generate-list-of-n-lisp-timestamp-ranges))
+#+end_src
+** dates
+*** generate-random-full-dash-date-string
 #+begin_src emacs-lisp :tangle yes
-(defalias 'generate-random-full-dash-date-string (-partial #'generate--create-random-full-date-string "-") "Returns a random date where parts are joined with dashes. Format will be one of the following: YYYY-M-D, YYYY-MM-DD, M-D-YYYY, MM-DD-YYYY, D-M-YYYY or DD-MM-YYYY")
+(defalias 'generate-random-full-dash-date-string (apply-partially #'generate--create-random-full-date-string "-") "Returns a random date
+The parts are joined with dashes.
+Format will be one of the following:
+YYYY-M-D
+YYYY-MM-DD
+M-D-YYYY
+MM-DD-YYYY
+D-M-YYYY
+DD-MM-YYYY")
 #+end_src
-** generate-random-short-slash-date-string
+*** generate-random-short-slash-date-string
 #+begin_src emacs-lisp :tangle yes
-(defalias 'generate-random-short-slash-date-string (-partial #'generate--create-random-short-date-string "/") "Returns a random short date where parts are joined with slashes. Format will be one of the following: YY/M, YY/MM, M/YY, MM/YY, YYYY/M, YYYY/MM, M/YYYY or MM/YYYY.")
+(defalias 'generate-random-short-slash-date-string (apply-partially #'generate--create-random-short-date-string "/") "Returns a random short date.
+The parts are joined with slashes.
+Format will be one of the following:
+YY/M
+YY/MM
+M/YY
+MM/YY
+YYYY/M
+YYYY/MM
+M/YYYY
+MM/YYYY")
 #+end_src
-** generate-random-short-dash-date-string
+*** generate-random-short-dash-date-string
 #+begin_src emacs-lisp :tangle yes
-(defalias 'generate-random-short-dash-date-string (-partial #'generate--create-random-short-date-string "-") "Returns a random short date where parts are joined with dashes. Format will be one of the following: YY-M, YY-MM, M-YY, MM-YY, YYYY-M, YYYY-MM, M-YYYY or MM-YYYY.")
+(defalias 'generate-random-short-dash-date-string (apply-partially #'generate--create-random-short-date-string "-") "Returns a random short date.
+The parts will be joined with dashes.
+Format will be one of the following:
+YY-M
+YY-MM
+M-YY
+MM-YY
+YYYY-M
+YYYY-MM
+M-YYYY
+MM-YYYY ")
 #+end_src
-** generate-random-date-string
+*** generate-random-date-string
 #+begin_src emacs-lisp :tangle yes
-(defalias 'generate-random-date-string (-partial #'generate-call-random-function (list #'generate-random-full-dash-date-string #'generate-random-full-slash-date-string #'generate-random-short-dash-date-string #'generate-random-short-slash-date-string)))
+(defalias 'generate-random-date-string (apply-partially #'generate-call-random-function (list #'generate-random-full-dash-date-string #'generate-random-full-slash-date-string #'generate-random-short-dash-date-string #'generate-random-short-slash-date-string)))
 #+end_src
-* identifiers
-** generate-random-regular-phone-number
+** identifiers
+*** generate-random-regular-phone-number
 #+begin_src emacs-lisp :tangle yes
-(defalias 'generate--create-random-regular-phone-number (-compose (-partial #'s-join "-") (-partial #'seq-map (-partial #'s-join "")) (-juxt (-partial #'-take 3) (-rpartial #'-slice 3 6) (-partial #'-take-last 4))) "Helper used to convert LIST into a random U.S. style phone number.")
-(defalias 'generate-random-regular-phone-number (-partial #'generate-data :min-length 10 :max-length 10 :item-transformer #'generate--get-next-num-between-zero-and-nine-string :list-transformer #'generate--create-random-regular-phone-number) "Returns a random U.S. style phone number.")
+(defalias 'generate--create-random-regular-phone-number (-compose (apply-partially #'s-join "-") (apply-partially #'seq-map (apply-partially #'s-join "")) (-juxt (apply-partially #'-take 3) (-rpartial #'-slice 3 6) (apply-partially #'-take-last 4))) "Helper used to convert LIST into a random U.S. style phone number.")
+(defalias 'generate-random-regular-phone-number (apply-partially #'generate-data :min-length 10 :max-length 10 :item-transformer #'generate--get-next-num-between-zero-and-nine-string :list-transformer #'generate--create-random-regular-phone-number) "Returns a random U.S. style phone number.")
 #+end_src
-** generate-random-1-800-number
+*** generate-random-1-800-number
 #+begin_src emacs-lisp :tangle yes
-(defalias 'generate--create-random-1-800-number (-compose (-partial #'concat "1-800-") (-partial #'s-join "-") (-partial #'seq-map (-partial #'s-join "")) (-juxt (-partial #'-take 3) (-partial #'-take-last 4))) "Helper used to convert LIST into a random 1-800 number.")
-(defalias 'generate-random-1-800-number (-partial #'generate-data :min-length 7 :max-length 7 :item-transformer #'generate--get-next-num-between-zero-and-nine-string :list-transformer #'generate--create-random-1-800-number) "Returns a random 1-800 number.")
+(defalias 'generate--create-random-1-800-number (-compose (apply-partially #'concat "1-800-") (apply-partially #'s-join "-") (apply-partially #'seq-map (apply-partially #'s-join "")) (-juxt (apply-partially #'-take 3) (apply-partially #'-take-last 4))) "Helper used to convert LIST into a random 1-800 number.")
+
+(defalias 'generate-random-1-800-number (apply-partially #'generate-data :min-length 7 :max-length 7 :item-transformer #'generate--get-next-num-between-zero-and-nine-string :list-transformer #'generate--create-random-1-800-number) "Returns a random 1-800 number.")
 #+end_src
-** generate-random-phone-number
+*** generate-random-phone-number
 #+begin_src emacs-lisp :tangle yes
-(defalias 'generate-random-phone-number (-partial #'generate-call-random-function (list #'generate-random-regular-phone-number #'generate-random-1-800-number)) "Returns a random phone number.")
+(defalias 'generate-random-phone-number (apply-partially #'generate-call-random-function (list #'generate-random-regular-phone-number #'generate-random-1-800-number)) "Returns a random phone number.")
 #+end_src
-** generate-random-card-number
+*** generate-random-card-number
 #+begin_src emacs-lisp :tangle yes
-(defalias 'generate--create-random-card-number (-compose (-partial #'s-join "-") (-partial #'seq-map (-partial #'s-join "")) (-rpartial #'seq-split 4)) "Helper used to convert LIST into a card number string.")
-(defalias 'generate-random-card-number (-partial #'generate-data :min-length 16 :max-length 16 :item-transformer #'generate--get-next-num-between-zero-and-nine-string :list-transformer #'generate--create-random-card-number) "Returns a random 16-digit card number.")
+(defalias 'generate--create-random-card-number (-compose (apply-partially #'s-join "-") (apply-partially #'seq-map (apply-partially #'s-join "")) (-rpartial #'seq-split 4)) "Helper used to convert LIST into a card number string.")
+(defalias 'generate-random-card-number (apply-partially #'generate-data :min-length 16 :max-length 16 :item-transformer #'generate--get-next-num-between-zero-and-nine-string :list-transformer #'generate--create-random-card-number) "Returns a random 16-digit card number.")
 #+end_src
-** generate-random-string-of-lower-alphanums
+*** generate-random-string-of-lower-alphanums
 #+begin_src emacs-lisp :tangle yes
-(defalias 'generate-random-string-of-lower-alphanums (-partial #'generate--random-identifier-string #'generate--get-next-lower-alpha-string) "Create a random alphanumeric identifier string. All alphabetic characters will be in lowercase.")
+(defalias 'generate-random-string-of-lower-alphanums (apply-partially #'generate--random-identifier-string #'generate--get-next-lower-alpha-string) "Create a random alphanumeric identifier string.
+All alphabetic characters will be in lowercase.")
 #+end_src
-** generate-random-string-of-upper-alphanums
+*** generate-random-string-of-upper-alphanums
 #+begin_src emacs-lisp :tangle yes
-(defalias 'generate-random-string-of-upper-alphanums (-partial #'generate--random-identifier-string #'generate--get-next-upper-alpha-string) "Create a random alphanumeric identifier string. All alphabetic characters will be in uppercase.")
+(defalias 'generate-random-string-of-upper-alphanums (apply-partially #'generate--random-identifier-string #'generate--get-next-upper-alpha-string) "Create a random alphanumeric identifier string.
+All alphabetic characters will be uppercase.")
 #+end_src
-* org-mode
-** org-table
-*** table generation
-**** generate-org-table-without-hlines
+** buffers
+*** generate-with-buffer-with-text
+#+begin_src elisp :tangle yes
+(defmacro generate-with-buffer-with-text (buffer-text &rest body)
+  "Run BODY in a temporary buffer with holding BUFFER-TEXT."
+  (declare (indent 1) (debug t))
+  `(with-temp-buffer
+     (insert ,buffer-text)
+     (goto-char (point-min))
+     ,@body))
+#+end_src
+** org-mode
+*** timestamps
+*** org-table
+**** table generation
+***** generate-org-table-without-hlines
 #+begin_src emacs-lisp :tangle yes
-(defalias 'generate-org-table-without-hlines (-compose #'car #'generate--org-table-without-hlines) "Create an org-table with ROWS and COLUMNS where each value is generated by VAL-GENERATOR. The resulting table will not have hlines. \(fn FUNCTION INTEGER INTEGER)")
+(defalias 'generate-org-table-without-hlines (-compose #'car #'generate--org-table-without-hlines) "Use ROWS, COLUMNS and VAL-GENERATOR to create an org-table.
+ROWS and COLUMNS should be integers. VAL-GENERATOR
+should take one argument, a list that will contain
+the current row and column number.
+The returned table will not have hlines.
+
+\(fn FUNCTION VAL-GENERATOR ROWS COLUMNS)")
 #+end_src
-**** generate-org-table-with-hlines
+***** generate-org-table-with-hlines
 #+begin_src emacs-lisp :tangle yes
-(defalias 'generate-org-table-with-hlines (-compose #'car #'generate--org-table-with-hlines) "Create an org-table with ROWS and COLUMNS where each value is generated by VAL-GENERATOR. The resulting table will have hlines. \(fn FUNCTION INTEGER INTEGER)")
+(defalias 'generate-org-table-with-hlines (-compose #'car #'generate--org-table-with-hlines) "Use ROWS, COLUMNS and VAL-GENERATOR to create an org-table.
+ROWS and COLUMNS should be integers. VAL-GENERATOR
+should take one argument, a list that will contain
+the current row and column number.
+The returned table will have hlines.
+
+\(fn FUNCTION VAL-GENERATOR ROWS COLUMNS)")
 #+end_src
-*** buffers with table
-**** generate-with-buffer-with-org-table-without-hlines
+***** generate-org-table
+#+begin_src emacs-lisp :tangle yes
+(defalias 'generate-org-table (-compose #'car #'generate--org-table) "Use ROWS, COLUMNS and VAL-GENERATOR to create an org-table.
+ROWS and COLUMNS should be integers.
+VAL-GENERATOR should take one argument,
+a list that will contain the current row and column
+number.  The returned table may or may
+not have hlines.
+
+\(fn FUNCTION VAL-GENERATOR ROWS COLUMNS)")
+#+end_src
+**** buffers with table
+***** generate-with-buffer-with-org-table-without-hlines
 #+begin_src emacs-lisp :tangle yes
 (cl-defmacro generate-with-buffer-with-org-table-without-hlines (org-table-args &rest body)
-    "Take ORG-TABLE-ARGS and use them to create a buffer with a table generated by generate-org-table-without-hlines.
-Execute BODY in buffer."
+    "Use ORG-TABLE-ARGS and use them to create a buffer with a table.
+The table will not have hlines.
+BODY will be executed in the buffer
+with the point at the beginning
+of the table."
   (declare (indent 1) (debug t))
   (generate--with-buffer-with-org-table-helper #'generate-org-table-without-hlines org-table-args body))
 #+end_src
-**** generate-with-buffer-with-org-table-with-hlines
+***** generate-with-buffer-with-org-table-with-hlines
 #+begin_src emacs-lisp :tangle yes
-
 (cl-defmacro generate-with-buffer-with-org-table-with-hlines (org-table-args &rest body)
-  "Take ORG-TABLE-ARGS and use them to create a buffer with a table generated by generate-org-table-with-hlines.
-Execute BODY in buffer."
+    "Use ORG-TABLE-ARGS and use them to create a buffer with a table.
+The table will not have hlines.
+BODY will be executed in the buffer
+with the point at the beginning
+of the table."
   (declare (indent 1) (debug t))
   (generate--with-buffer-with-org-table-helper #'generate-org-table-with-hlines org-table-args body))
 #+end_src
-**** generate-with-buffer-with-org-table
+***** generate-with-buffer-with-org-table
 #+begin_src emacs-lisp :tangle yes
 (cl-defmacro generate-with-buffer-with-org-table (org-table-args &rest body)
-  "Take ORG-TABLE-ARGS and use them to create a buffer with a table generated by generate-org-table-with-hlines.
-Execute BODY in buffer."
+    "Use ORG-TABLE-ARGS and use them to create a buffer with a table.
+The table may or may not have hlines.
+BODY will be executed in the buffer
+with the point at the beginning
+of the table."
   (declare (indent 1) (debug t))
   (generate--with-buffer-with-org-table-helper #'generate-org-table org-table-args body))
 #+end_src
-** org-element
-*** generate--list-of-org-element-src-blocks
-* misc
-** generate-random-boolean
-#+begin_src emacs-lisp :tangle yes
-(defalias 'generate-random-boolean (-partial #'generate-seq-take-random-value-from-seq (list 't 'nil)) "Returns a random boolean.")
+*** org-element
+**** generate--list-of-org-element-src-blocks
+** errors
+*** generate--random-void-x-error
+#+begin_src elisp :tangle yes
+(defun generate--random-void-x-error (symbol)
+  "Returns a closure that will generate a random void type error.
+SYMBOL should be void-function or void-variable."
+  (lambda ()
+    (:documentation (format "Returns a random %s error." symbol))
+    (list symbol (generate-random-symbol))))
 #+end_src
-** generate-random-symbol
-#+begin_src emacs-lisp :tangle yes
-(defalias 'generate-symbol (-partial #'generate-data :list-transformer (-compose #'make-symbol #'seq--into-string #'generate-seq-shuffle)) "Returns a random symbol.")
+*** generate-random-void-function-error
+#+begin_src elisp :tangle yes
+(defalias 'generate-random-void-function-error (generate--random-void-x-error 'void-function))
 #+end_src
-** generate-random-punctuation
-#+begin_src emacs-lisp :tangle yes
-(defalias 'generate-random-punctuation (-partial #'generate-seq-take-random-value-from-seq generate--PUNCTUATION) "Returns a random member of generate-PUNCTUATION.")
+*** generate-random-void-variable-error
+#+begin_src elisp :tangle yes
+(defalias 'generate-random-void-variable-error (generate--random-void-x-error 'void-variable))
 #+end_src
-* meta-generators
-** generate-random-value
+*** generate-random-wrong-type-argument
+#+begin_src elisp :tangle yes
+(defun generate-random-wrong-type-argument-error ()
+  "Returns a random wrong-type-argument error."
+  (let* ((random-val (generate-random-value))
+         (pred (funcall (-compose (apply-partially #'-first (lambda (func) (not (funcall func random-val)))) #'generate-shuffle-list) generate--PREDICATES)))
+  (list 'wrong-type-argument pred random-val)))
+#+end_src
+*** generate-arith-error
+#+begin_src elisp :tangle yes
+(defalias 'generate-arith-error (cl-constantly (list 'arith-error nil)) "Returns a random arith-error.")
+#+end_src
+*** generate--ERROR-GENERATORS
+#+begin_src elisp :tangle yes
+(defconst generate--ERROR-GENERATORS
+  (list
+   #'generate-random-void-function-error
+   #'generate-random-void-variable-error
+   #'generate-random-wrong-type-argument-error
+   #'generate-arith-error))
+#+end_src
+*** generate-random-error
+#+begin_src elisp :tangle yes
+(defalias 'generate-random-error (apply-partially #'generate-call-random-function generate--ERROR-GENERATORS) "Returns a random error.")
+#+end_src
+** backtrace
+*** generate-random-backtrace-frame
+#+begin_src elisp :tangle yes
+(defun generate-random-backtrace-frame ()
+  "Returns a random backtrace frame."
+  (let* ((evald (generate-random-boolean))
+         (fun (generate-random-symbol))
+         (args (generate-random-list-of-symbols))
+         (locals (generate-random-alist))
+         (flags (generate-seq-take-random-value-from-seq (list :debug-on-exit :source-available nil)))
+         (pos (generate-random-nat-number)))
+    (backtrace-make-frame
+     :evald evald
+     :fun fun
+     :args args
+     :flags flags
+     :locals locals
+     :buffer nil
+     :pos pos)))
+#+end_src
+*** generate-list-of-n-backtrace-frames
+#+begin_src elisp :tangle yes
+(defun generate-list-of-n-backtrace-frames (n)
+  "Returns a list with N random backtrace frames."
+  (let* ((list-of-evalds (generate-list-of-n-booleans n))
+         (list-of-funs (generate-list-of-n-symbols n))
+         (list-of-args (generate-list-of-n-symbols n))
+         (list-of-locals (generate-list-of-n-alists n))
+         (list-of-flags (generate-seq-take-infinite-shuffled n (list :debug-on-exit :source-available nil)))
+         (list-of-positions (sort (generate-list-of-nat-numbers :exact-length n))))
+    (seq-map-indexed (lambda (pos i) (backtrace-make-frame
+                                      :evald (nth i list-of-evalds)
+                                      :fun (nth i list-of-funs)
+                                      :args (nth i list-of-args)
+                                      :flags (nth i list-of-flags)
+                                      :locals (nth i list-of-locals)
+                                      :buffer nil
+                                      :pos pos))
+                     list-of-positions)))
+#+end_src
+*** generate-random-list-of-backtrace-frames
+#+begin_src elisp :tangle yes
+(defalias 'generate-random-list-of-backtrace-frames (generate-default-convert-n-gen-to-random #'generate-list-of-n-backtrace-frames) "Returns a random list of backtrace frames.")
+#+end_src
+** ert
+*** outcomes
+**** generate--random-ert-test-outcome
+#+begin_src elisp :tangle yes
+(defalias 'generate--random-ert-test-outcome (apply-partially #'generate-seq-take-random-value-from-seq generate--DEFAULT-OUTCOMES)
+  "Returns a random ert-test-outcome.")
+#+end_src
+**** generate--random-ert-expected-result-type
+#+begin_src elisp :tangle yes
+(defalias 'generate--random-ert-expected-result-type (apply-partially #'generate-seq-take-random-value-from-seq generate--EXPECTED-RESULT-TYPES))
+#+end_src
+**** generate--random-x-type-ert-test-outcome
+#+begin_src elisp :tangle yes
+(defun generate--random-x-type-ert-test-outcome-base (default-outcomes-plist)
+  (lambda (key expected-val)
+    (lambda ()
+      (:documentation (format "Returns a random ert-outcome whose %s equal %s." key expected-val))
+      (let ((filtered-outcomes (map-filter (lambda (_ attributes) (equal (generate--plist-get key attributes) expected-val)) default-outcomes-plist)))
+        (generate-map-random-key filtered-outcomes)))))
+
+(defalias 'generate--random-x-type-ert-test-outcome (generate--random-x-type-ert-test-outcome-base generate--DEFAULT-OUTCOMES-PLIST))
+#+end_src
+**** generate--random-exclusive-ert-test-outcome
+#+begin_src elisp :tangle yes
+(defalias 'generate--random-exclusive-ert-test-outcome (generate--random-x-type-ert-test-outcome :exclusive 't))
+#+end_src
+**** generate--random-non-exclusive-ert-test-outcome
+#+begin_src elisp :tangle yes
+(defalias 'generate--random-non-exclusive-ert-test-outcome (generate--random-x-type-ert-test-outcome :exclusive 'nil))
+#+end_src
+**** generate--random-expected-ert-test-outcome
+#+begin_src elisp :tangle yes
+(defalias 'generate--random-expected-ert-test-outcome (generate--random-x-type-ert-test-outcome :expectedp 't))
+#+end_src
+**** generate--random-unexpected-ert-test-outcome
+#+begin_src elisp :tangle yes
+(defalias 'generate--random-unexpected-ert-test-outcome (generate--random-x-type-ert-test-outcome :expectedp 'nil))
+#+end_src
+*** should
+**** should helpers
+***** generate--make-should-form-gen-for-type-x
+#+begin_src elisp :tangle yes
+(defun generate--make-should-form-gen-for-type-x (pcase-randomizer)
+  (lambda (passing assert-symbol random-val)
+    (let* ((random-n (generate-random-nat-number))
+           (should-val (funcall pcase-randomizer random-n random-val)))
+      (pcase-exhaustive (list passing assert-symbol)
+        (`(t should) (list assert-symbol should-val))
+        (`(nil should) (list assert-symbol (list 'not should-val)))
+        (`(t should-not) (list assert-symbol (list 'not should-val)))
+        (`(nil should-not) (list assert-symbol should-val))))))
+#+end_src
+***** generate--catchall-should
+#+begin_src elisp :tangle yes
+(defun generate--catchall-should-pcase (n val)
+  (pcase-exhaustive (% n 3)
+    (0 (list 'equal val val))
+    (1 (list 'equal (list val) (list val)))
+    (2 (list 'equal (vector val) (vector val)))))
+
+(defalias 'generate--catchall-should (generate--make-should-form-gen-for-type-x #'generate--catchall-should-pcase))
+#+end_src
+***** generate--number-should
+#+begin_src elisp :tangle yes
+(defun generate--number-should-pcase (n number)
+  (pcase-exhaustive (% n 5)
+    (0 (list 'numberp number))
+    (1 (list 'plusp (abs number)))
+    (2 (list 'minusp (* 1 (abs number))))
+    (3 (list 'floatp (* 1.0 number)))
+    (4 (generate--catchall-should-pcase n number))))
+
+(defalias 'generate--number-should (generate--make-should-form-gen-for-type-x #'generate--number-should-pcase))
+#+end_src
+***** generate--symbol-should
+#+begin_src elisp :tangle yes
+(defun generate--symbol-should-pcase (n symbol)
+  (pcase-exhaustive (% n 3)
+    (0 (list 'symbolp symbol))
+    (1 (equal (list 'symbol-name symbol) (list 'symbol-name symbol)))
+    (2 (generate--catchall-should-pcase n symbol))))
+
+(defalias 'generate--symbol-should (generate--make-should-form-gen-for-type-x #'generate--symbol-should-pcase))
+#+end_src
+***** generate--seq-should
+#+begin_src elisp :tangle yes
+(defun generate--seq-should-pcase (n seq)
+  (pcase-exhaustive (% n 5)
+    (0 (list 'seqp seq))
+    (1 (list 'equal (list 'seq-positions seq) (list 'seq-positions seq)))
+    (2 (list 'equal (list 'seq-uniq seq) (list 'seq-uniq seq)))
+    (3 (list 'seq-contains-p seq (seq-first seq)))
+    (4 (generate--catchall-should-pcase n seq))))
+
+(defalias 'generate--seq-should (generate--make-should-form-gen-for-type-x #'generate--seq-should-pcase))
+#+end_src
+***** generate--map-should
+#+begin_src elisp :tangle yes
+(defun generate--map-should-pcase (n map)
+  (pcase-exhaustive (% n 5)
+    (0 (list 'mapp map))
+    (1 (list 'equal (list 'map-keys map) (list 'map-keys map)))
+    (2 (list 'equal (list 'map-values map) (list 'map-values map)))
+    (3 (list 'map-elt (car (map-keys map)) map))
+    (4 (generate--catchall-should-pcase n map))))
+
+(defalias 'generate--map-should (generate--make-should-form-gen-for-type-x #'generate--map-should-pcase))
+#+end_src
+***** generate-should-form-for-type-x - ;; is-type, is-equal-to-self, exists, extra
+#+begin_src elisp :tangle yes
+(cl-defun generate--should-form-for-type-x (&key passing assert-symbol)
+  (cl-function (lambda (&optional val)
+               (let ((random-val (or val (generate-random-value))))
+                 (pcase-exhaustive random-val
+                   ((pred seqp) (generate--seq-should passing assert-symbol random-val))
+                   ((pred mapp) (generate--map-should passing assert-symbol random-val))
+                   ((pred symbolp) (generate--symbol-should passing assert-symbol random-val))
+                   (_ (generate--catchall-should passing assert-symbol random-val)))))))
+#+end_src
+**** generate-passing-should-form
+#+begin_src elisp :tangle yes
+(defalias 'generate-passing-should-form (generate--should-form-for-type-x :passing t :assert-symbol 'should)
+  "Returns a random passing should form.")
+#+end_src
+**** generate-passing-should-not-form
+#+begin_src elisp :tangle yes
+(defalias 'generate-passing-should-not-form (generate--should-form-for-type-x :passing t :assert-symbol 'should-not)
+  "Returns a random passing should-not form.")
+#+end_src
+**** generate-failing-should-form
+#+begin_src elisp :tangle yes
+(defalias 'generate-failing-should-form (generate--should-form-for-type-x :passing 'nil :assert-symbol 'should)
+  "Returns a random failing should form.")
+#+end_src
+**** generate-failing-should-not-form
+#+begin_src elisp :tangle yes
+(defalias 'generate-failing-should-not-form (generate--should-form-for-type-x :passing 'nil :assert-symbol 'should-not)
+  "Returns a random failing should-not form.")
+#+end_src
+**** generate-random-passing-should
+#+begin_src elisp :tangle yes
+(defalias 'generate-random-passing-should (apply-partially #'generate-call-random-function (list #'generate-passing-should-form
+                                                                                          #'generate-passing-should-not-form))
+  "Returns a random passing should form.
+The actual asserter will be either `should' or `should-not'.")
+#+end_src
+**** generate-random-failing-should
+#+begin_src elisp :tangle yes
+(defalias 'generate-random-failing-should (apply-partially #'generate-call-random-function (list #'generate-failing-should-form
+                                                                                          #'generate-failing-should-not-form))
+  "Returns a random failing should form.
+The actual asserter will be either `should' or `should-not'.")
+#+end_src
+**** generate-random-should
+#+begin_src elisp :tangle yes
+(defalias 'generate-random-should (apply-partially #'generate-call-random-function (list #'generate-passing-should-form
+                                                                                  #'generate-passing-should-not-form
+                                                                                  #'generate-failing-should-form
+                                                                                  #'generate-failing-should-not-form))
+  "Returns a random should form.
+The actual asserter will be either `should' or `should-not'.
+The form itself may be a passing form or a failing form.")
+#+end_src
+**** generate--list-of-n-passing-should-forms-helper
+#+begin_src elisp :tangle yes
+(cl-defun generate--list-of-n-passing-should-forms-helper (val (passing assert-symbol))
+  (funcall (generate--should-form-for-type-x :passing passing :assert-symbol assert-symbol) val))
+#+end_src
+**** generate-list-of-n-passing-should-forms
+#+begin_src elisp :tangle yes
+(defun generate-list-of-n-passing-should-forms (n)
+  "Returns a list of N passing shoulds forms."
+  (let* ((vals (generate-list-of-n-random-values n))
+         (should-count (generate--random-nat-number-between-0-and n))
+         (should-not-count (- n should-count))
+         (shoulds (generate-seq-take-infinite should-count (list (list 't 'should))))
+         (should-nots (generate-seq-take-infinite should-not-count (list (list 't 'should-not))))
+         (all-should-args (generate-append-and-shuffle shoulds should-nots)))
+    (-zip-with #'generate--list-of-n-passing-should-forms-helper vals all-should-args)))
+#+end_src
+**** generate-list-of-n-should-forms-with-a-fail
+#+begin_src elisp :tangle yes
+(defun generate-list-of-n-should-forms-with-a-fail (n)
+  "Returns a list of N shoulds forms.
+One of those forms will be a failing form."
+  (let* ((passing-forms (generate-list-of-n-passing-should-forms (1- n)))
+         (failing-form (generate-random-failing-should)))
+    (generate-append-and-shuffle passing-forms (list failing-form))))
+#+end_src
+**** generate-random-list-of-should-forms-with-a-fail
+#+begin_src elisp :tangle yes
+(defalias 'generate-random-list-of-should-forms-with-a-fail (generate-default-convert-n-gen-to-random #'generate-list-of-n-should-forms-with-a-fail)
+  "Returns a random list of should forms.
+One of those forms will be a failing form.")
+#+end_src
+**** generate-random-list-of-passing-should-forms
+#+begin_src elisp :tangle yes
+(defalias 'generate-random-list-of-passing-should-forms (generate-default-convert-n-gen-to-random #'generate-list-of-n-passing-should-forms)
+  "Returns a random list of passing should forms.")
+#+end_src
+*** ert-test-result-condition
+**** generate--ert-test-failed-error
+#+begin_src elisp :tangle yes
+(defun generate--ert-test-failed-error (failing-should)
+    "Returns a valid `ert-test-failed' error.
+FAILING-SHOULD should be a valid `should', e.g., (should (equal x y))."
+  (list 'ert-test-failed (list failing-should :form (cadr failing-should) :value nil)))
+#+end_src
+**** generate--ert-test-failed-condition-helper
+#+begin_src elisp :tangle yes
+(defun generate--ert-test-failed-condition-helper (error-generators)
+  (lambda (failing-should)
+    (let* ((funcs (cons (apply-partially #'generate--ert-test-failed-error failing-should) error-generators)))
+      (generate-call-random-function funcs))))
+#+end_src
+**** generate--ert-test-failed-condition
+#+begin_src elisp :tangle yes
+(defalias 'generate--ert-test-failed-condition (generate--ert-test-failed-condition-helper generate--ERROR-GENERATORS)
+  "Returns a valid `ert-test-failed' condition.
+FAILED-SHOULD should be a valid `should', e.g., (should (equal x y)).
+
+\(fn FAILING-SHOULD)")
+#+end_src
+**** generate--ert-test-skipped-condition
+#+begin_src elisp :tangle yes
+(defun generate--ert-test-skipped-condition (skipped-should)
+  "Returns a valid `ert-test-skipped' condition.
+SKIPPED-SHOULD should be a valid `should', e.g., (should (equal x y))."
+  (list 'ert-test-skipped (list skipped-should :form (cadr skipped-should) :value 't)))
+#+end_src
+*** ert-test-result
+**** generate-ert-test-result-object
+#+begin_src elisp :tangle yes
+(cl-defun generate-ert-test-result-object (outcome duration)
+  "Returns an ert-test-result object.
+OUTCOME must be a valid ert-test outcome.
+DURATION must be a number."
+  (thunk-let* ((passing-should-forms (generate-random-list-of-passing-should-forms))
+               (random-ert-skipped-condition (generate--ert-test-skipped-condition (generate-seq-take-random-value-from-seq passing-should-forms)))
+               (list-of-should-forms-with-a-fail (generate-random-list-of-should-forms-with-a-fail))
+               (should-forms-with-a-fail (car list-of-should-forms-with-a-fail))
+               (failing-should (cadr should-forms-with-a-fail))
+               (random-ert-failed-condition (generate--ert-test-failed-condition failing-should))
+               (backtrace-frames (generate-random-list-of-backtrace-frames))
+               (random-message (generate-random-sentence)))
+    (pcase outcome
+      (:passed-expected (make-ert-test-passed :messages ""
+                                              :should-forms passing-should-forms
+                                              :duration duration))
+      (:passed-unexpected (make-ert-test-passed :messages ""
+                                                :should-forms passing-should-forms
+                                                :duration duration))
+      (:skipped (make-ert-test-skipped :messages ""
+                                       :should-forms passing-should-forms
+                                       :duration duration
+                                       :condition random-ert-skipped-condition
+                                       :backtrace backtrace-frames
+                                       :infos nil))
+      (:failed-unexpected (make-ert-test-failed :messages random-message
+                                                :should-forms should-forms-with-a-fail
+                                                :duration duration
+                                                :condition random-ert-failed-condition
+                                                :backtrace backtrace-frames
+                                                :infos nil))
+      (:failed-expected (make-ert-test-failed :messages random-message
+                                              :should-forms should-forms-with-a-fail
+                                              :duration duration
+                                              :condition random-ert-failed-condition
+                                              :backtrace backtrace-frames
+                                              :infos nil)))))
+#+end_src
+**** generate--plist-of-ert-test-result-objects
+#+begin_src elisp :tangle yes
+(defun generate--plist-of-ert-test-result-objects (all-outcome-duration-pairs)
+  (-flatten-n 1 (mapcar (-juxt #'car (-compose #'list (-applify #'generate-ert-test-result-object))) all-outcome-duration-pairs)))
+#+end_src
+**** generate--take-from-plist-of-ert-test-results
+#+begin_src elisp :tangle yes
+(defun generate--take-from-plist-of-ert-test-results-helper (test-plist-of-ert-test-result-objects)
+  (-lambda (outcome cnt-to-take)
+    (generate-seq-take-infinite cnt-to-take (generate--plist-get outcome test-plist-of-ert-test-result-objects))))
+
+(defun generate--take-from-plist-of-ert-test-results (test-plist-of-ert-test-result-objects test-outcomes-count-plist)
+  (funcall (-compose (apply-partially #'-flatten-n 1) #'map-apply) (generate--take-from-plist-of-ert-test-results-helper test-plist-of-ert-test-result-objects) test-outcomes-count-plist))
+#+end_src
+*** generate-ert-test
+#+begin_src elisp :tangle yes
+(cl-defun generate-ert-test (test-name &key documentation tags file-name expected-result-type)
+  "Returns an ert-test object named TEST-NAME.
+DOCUMENTATION, TAGS, FILE-NAME and EXPECTED-RESULT-TYPE
+are optional values that can be used to further customize
+the ert-test object."
+  (let ((test-symbol (intern test-name))
+        (test-func-body (generate-random-should)))
+    (make-ert-test
+     :name test-symbol
+     :tags (or tags '())
+     :documentation (or documentation (generate-random-sentence))
+     :body (lambda () test-func-body nil)
+     :expected-result-type (or expected-result-type ':passed)
+     :file-name (or file-name (generate-random-file-name)))))
+#+end_src
+** file
+*** generate-random-file-extension
+#+begin_src elisp :tangle yes
+(defalias 'generate-random-file-extension (apply-partially #'generate-seq-take-random-value-from-seq generate--FILE-EXTENSIONS) "Returns a random file extension.")
+#+end_src
+*** generate-random-file-name
+#+begin_src elisp :tangle yes
+(defun generate-random-file-name ()
+  "Returns a random file name."
+  (concat (generate-random-word) "." (generate-random-file-extension)))
+#+end_src
+*** generate--nth-mod-file-extensions
+#+begin_src elisp :tangle yes
+(defalias 'generate--nth-mod-file-extensions (-rpartial #'generate-nth-mod generate--FILE-EXTENSIONS))
+#+end_src
+** composite generators
+*** generate-random-value
 #+begin_src emacs-lisp :tangle yes
 (defalias 'generate-random-value (-compose #'funcall #'generate--get-random-generator) "Returns a random value.")
 #+end_src
@@ -595,4 +1442,25 @@ plist
 seq
 map
 #+end_src
-
+** misc
+*** generate-random-punctuation
+#+begin_src emacs-lisp :tangle yes
+(defalias 'generate-random-punctuation (apply-partially #'generate-seq-take-random-value-from-seq generate--PUNCTUATION) "Returns a random member of generate-PUNCTUATION.")
+#+end_src
+*** generate-random-color
+#+begin_src elisp :tangle yes
+(defalias 'generate-random-color (-compose (-applify #'color-rgb-to-hex) (apply-partially #'generate-list-of-floats-between-0-and-1 :exact-length 3)))
+#+end_src
+*** generate-list-of-n-colors
+#+begin_src elisp :tangle yes
+(defun generate-list-of-n-colors (n)
+  "Returns a list of N colors.
+Values are hexadecimals."
+  (let* ((float-count (* n 3))
+         (floats (generate-list-of-floats-between-0-and-1 :exact-length float-count)))
+    (funcall (-compose (apply-partially #'mapcar (-applify #'color-rgb-to-hex)) #'-partition) 3 floats)))
+#+end_src
+*** generate-random-list-of-colors
+#+begin_src elisp :tangle yes
+(defalias 'generate-random-list-of-colors (generate-default-convert-n-gen-to-random #'generate-list-of-n-colors))
+#+end_src
