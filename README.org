@@ -1,10 +1,8 @@
 * *Why?*
-#+begin
 This packages includes a host random data generators for almost every Emacs Lisp data type.
 This package also includes a wrapper for the ert-deftest macro called generate-ert-deftest-n-times.
 Finally this package includes two new test-runners, generate-run-tests-batch and generate-run-tests-batch-and-exit, drop in replacement for ert-run-tests-batch
 and ert-run-tests-batch-and-exit.
-#+end
 * *Naming Conventions*
 ** generate-random-x:
 - no arguments, e.g., generate-random-vector, generate-random-string, generate-random-boolean
@@ -20,7 +18,7 @@ optional keywords arguments, e.g., [:max-length INTEGER] [:min-length INTEGER] [
   :tag "generate"
   :group 'lisp)
 
-(defcustom generate-lisp-timestamp-range-size generate--SECONDS-IN-AN-HOUR
+(defcustom generate-lisp-timestamp-range-size generate--SECONDS-IN-A-YEAR
   "The size of the range from which random timestamps will be taken."
   :group 'generate
   :type 'natnum)
@@ -67,6 +65,44 @@ If NUM-RUNS is not specified, your test will be defined 100 times.
                               `(:tags ,tags))
                           :body (lambda () ,body nil)
                           :file-name ,(or (macroexp-file-name) buffer-file-name))))))))
+#+end_src
+** generate-run-tests-batch
+#+begin_src elisp :tangle yes
+;;;###autoload
+(defun generate-run-tests-batch (&optional selector)
+    "Run the tests specified by SELECTOR, printing results to the terminal.
+
+SELECTOR selects which tests to run as described in `ert-select-tests' when
+called with its second argument t, except if SELECTOR is nil, in which case
+all tests rather than none will be run; this makes the command line
+ \"emacs -batch -l my-tests.el -f generate-run-tests-batch-and-exit\" useful.
+
+Returns the stats object.
+
+This is generate's implementation of `ert-run-tests-batch'."
+  (let* ((tests (ert-select-tests selector t))
+         (tests-groups-alist (generate--create-tests-groups-alist tests))
+         (listener (generate--create-run-tests-batch-listener selector tests-groups-alist)))
+    (ert-run-tests selector listener)))
+#+end_src
+** generate-run-tests-batch-and-exit
+#+begin_src elisp :tangle yes
+;;;###autoload
+(cl-defun generate-run-tests-batch-and-exit (&optional (selector t))
+    "Like `generate-run-tests-batch', but exits Emacs when done.
+
+The exit status will be 0 if all test results were as expected, 1
+on unexpected results, or 2 if the tool detected an error outside
+of the tests (e.g. invalid SELECTOR or bug in the code that runs
+the tests).
+
+This is generate's implementation of `ert-run-tests-batch-and-exit'."
+  (let ((tests (ert-select-tests selector t)))
+    (cl-letf (((symbol-function 'ert-run-tests-batch)
+               (symbol-function 'generate-run-tests-batch))
+              ((symbol-function 'ert-select-tests)
+               (lambda (&rest _) tests)))
+      (ert-run-tests-batch-and-exit selector))))
 #+end_src
 * Utilities
 * generators
@@ -825,7 +861,7 @@ Each timestamp will be in the
 #+end_src
 *** generate-list-of-n-lisp-timestamp-ranges
 #+begin_src elisp :tangle yes
-(cl-defun generate-list-of-n-lisp-timestamp-ranges (n &optional (range-size generate--SECONDS-IN-AN-HOUR))
+(cl-defun generate-list-of-n-lisp-timestamp-ranges (n &optional (range-size generate-lisp-timestamp-range-size))
   "Returns N Lisp timestamp ranges.
 RANGE-SIZE can be used to widen or shrink the range.
 Timestamps will be in the (TICKS . HZ) format."
@@ -923,7 +959,6 @@ All alphabetic characters will be uppercase.")
      ,@body))
 #+end_src
 ** org-mode
-*** timestamps
 *** org-table
 **** table generation
 ***** generate-org-table-without-hlines
@@ -991,8 +1026,90 @@ of the table."
   (declare (indent 1) (debug t))
   (generate--with-buffer-with-org-table-helper #'generate-org-table org-table-args body))
 #+end_src
-*** org-element
-**** generate--list-of-org-element-src-blocks
+*** timestamps
+**** helpers
+***** generate--org-timestamp-string
+#+begin_src elisp :tangle yes
+(defun generate--org-timestamp-string (lisp-timestamp with-time inactive)  
+  (format-time-string
+   (org-time-stamp-format with-time inactive)
+   lisp-timestamp))
+#+end_src
+***** generate--org-timestamp
+#+begin_src elisp :tangle yes
+(cl-defun generate--org-timestamp (inactive &optional (transformer #'generate--org-timestamp-string) (type "string"))
+  (lambda (with-time)
+    (:documentation (format "Returns an %s org timestamp %s.
+
+\(fn WITH-TIME)" (if inactive "inactive" "active") type))
+    (funcall
+     transformer     
+     (generate-random-lisp-timestamp)
+     with-time
+     inactive)))
+#+end_src
+**** strings
+***** inactive
+****** generate-inactive-org-timestamp-string
+#+begin_src elisp :tangle yes
+(defalias 'generate-inactive-org-timestamp-string (generate--org-timestamp 't))
+#+end_src
+****** generate-random-inactive-org-timestamp-string
+#+begin_src elisp :tangle yes
+(defalias 'generate-random-inactive-org-timestamp-string (-compose #'generate-inactive-org-timestamp-string #'generate-random-boolean) "Returns an inactive org timestamp.
+The timestamp may or may not have
+a start time.")
+#+end_src
+***** active
+****** generate-active-org-timestamp-string
+#+begin_src elisp :tangle yes
+(defalias 'generate-active-org-timestamp-string (generate--org-timestamp 'nil))
+#+end_src
+****** generate-random-active-org-timestamp-string
+#+begin_src elisp :tangle yes
+(defalias 'generate-random-active-org-timestamp-string  (-compose #'generate-active-org-timestamp-string #'generate-random-boolean) "Returns an active org timestamp.
+The timestamp may or may not have
+a start time.")
+#+end_src
+***** generate-org-timestamp-string
+#+begin_src elisp :tangle yes
+(defun generate-org-timestamp-string (with-time)
+  "Returns a random org timestamp.
+If WITH-TIME is t, the timestamp
+will have a start time."
+  (funcall (generate--org-timestamp (generate-random-boolean)) with-time))
+#+end_src
+***** generate-random-org-timestamp-string
+#+begin_src elisp :tangle yes
+(defalias 'generate-random-org-timestamp-string (-compose #'generate-org-timestamp-string #'generate-random-boolean) "Returns a random org timestamp.
+The timestamp may or may not be inactive.
+The timestamp may or may not have a
+start time.")
+#+end_src
+**** org-elements
+***** generate-random-inactive-org-timestamp-element
+#+begin_src elisp :tangle yes
+(defalias 'generate-random-inactive-org-timestamp-element (generate--org-timestamp 't #'org-timestamp-from-time "element"))
+#+end_src
+***** generate-random-active-org-timestamp-element
+#+begin_src elisp :tangle yes
+(defalias 'generate-random-active-org-timestamp-element (generate--org-timestamp 'nil #'org-timestamp-from-time "element"))
+#+end_src
+***** generate-org-timestamp-element
+#+begin_src elisp :tangle yes
+(defun generate-org-timestamp-element (with-time)
+  "Returns a random org timestamp element.
+If WITH-TIME is t, the timestamp
+will have a start time."
+  (funcall (generate--org-timestamp (generate-random-boolean) #'org-timestamp-from-time "element") with-time))
+#+end_src
+***** generate-random-org-timestamp-element
+#+begin_src elisp :tangle yes
+(defalias 'generate-random-org-timestamp-element (-compose #'generate-org-timestamp-element #'generate-random-boolean) "Returns a random org timestamp.
+The timestamp may or may not be inactive.
+The timestamp may or may not have a
+start time.")
+#+end_src
 ** errors
 *** generate--random-void-x-error
 #+begin_src elisp :tangle yes
