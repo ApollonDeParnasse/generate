@@ -97,12 +97,6 @@
    #'characterp
    #'booleanp))
 
-(defconst generate--SECONDS-IN-AN-HOUR
-  (* 60 60))
-(defconst generate--SECONDS-IN-A-DAY
-  (* 60 60 24))
-(defconst generate--SECONDS-IN-A-MONTH
-  (* 60 60 24 30))
 (defconst generate--SECONDS-IN-A-YEAR
   (* 60 60 24 30 12))
 
@@ -156,7 +150,7 @@
   :tag "generate"
   :group 'lisp)
 
-(defcustom generate-lisp-timestamp-range-size generate--SECONDS-IN-AN-HOUR
+(defcustom generate-lisp-timestamp-range-size generate--SECONDS-IN-A-YEAR
   "The size of the range from which random timestamps will be taken."
   :group 'generate
   :type 'natnum)
@@ -1687,7 +1681,7 @@ Each timestamp will be in the
 	    (raw-ranges (-partition 2 timestamps)))
       (mapcar (-rpartial #'sort :key #'car) raw-ranges)))
 
-(cl-defun generate-list-of-n-lisp-timestamp-ranges (n &optional (range-size generate--SECONDS-IN-AN-HOUR))
+(cl-defun generate-list-of-n-lisp-timestamp-ranges (n &optional (range-size generate-lisp-timestamp-range-size))
   "Returns N Lisp timestamp ranges.
 RANGE-SIZE can be used to widen or shrink the range.
 Timestamps will be in the (TICKS . HZ) format."
@@ -1963,6 +1957,60 @@ with the point at the beginning
 of the table."
   (declare (indent 1) (debug t))
   (generate--with-buffer-with-org-table-helper #'generate-org-table org-table-args body))
+
+(defun generate--org-timestamp-string (lisp-timestamp with-time inactive)  
+  (format-time-string
+   (org-time-stamp-format with-time inactive)
+   lisp-timestamp))
+
+(cl-defun generate--org-timestamp (inactive &optional (transformer #'generate--org-timestamp-string) (type "string"))
+  (lambda (with-time)
+    (:documentation (format "Returns an %s org timestamp %s.
+
+\(fn WITH-TIME)" (if inactive "inactive" "active") type))
+    (funcall
+     transformer     
+     (generate-random-lisp-timestamp)
+     with-time
+     inactive)))
+
+(defalias 'generate-inactive-org-timestamp-string (generate--org-timestamp 't))
+
+(defalias 'generate-random-inactive-org-timestamp-string (-compose #'generate-inactive-org-timestamp-string #'generate-random-boolean) "Returns an inactive org timestamp.
+The timestamp may or may not have
+a start time.")
+
+(defalias 'generate-active-org-timestamp-string (generate--org-timestamp 'nil))
+
+(defalias 'generate-random-active-org-timestamp-string  (-compose #'generate-active-org-timestamp-string #'generate-random-boolean) "Returns an active org timestamp.
+The timestamp may or may not have
+a start time.")
+
+(defun generate-org-timestamp-string (with-time)
+  "Returns a random org timestamp.
+If WITH-TIME is t, the timestamp
+will have a start time."
+  (funcall (generate--org-timestamp (generate-random-boolean)) with-time))
+
+(defalias 'generate-random-org-timestamp-string (-compose #'generate-org-timestamp-string #'generate-random-boolean) "Returns a random org timestamp.
+The timestamp may or may not be inactive.
+The timestamp may or may not have a
+start time.")
+
+(defalias 'generate-random-inactive-org-timestamp-element (generate--org-timestamp 't #'org-timestamp-from-time "element"))
+
+(defalias 'generate-random-active-org-timestamp-element (generate--org-timestamp 'nil #'org-timestamp-from-time "element"))
+
+(defun generate-org-timestamp-element (with-time)
+  "Returns a random org timestamp element.
+If WITH-TIME is t, the timestamp
+will have a start time."
+  (funcall (generate--org-timestamp (generate-random-boolean) #'org-timestamp-from-time "element") with-time))
+
+(defalias 'generate-random-org-timestamp-element (-compose #'generate-org-timestamp-element #'generate-random-boolean) "Returns a random org timestamp.
+The timestamp may or may not be inactive.
+The timestamp may or may not have a
+start time.")
 
 (defun generate--random-void-x-error (symbol)
   "Returns a closure that will generate a random void type error.
