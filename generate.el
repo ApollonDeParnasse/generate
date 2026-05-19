@@ -2372,9 +2372,9 @@ the ert-test object."
    (cons "map" generate--MAP-GENS))
   "Each type of generator in this list will available at run time.")
 
-(defalias 'generate--get-random-generator-type (apply-partially (-compose #'generate-seq-take-random-value-from-seq #'map-keys) generate--TYPE-GEN-MAP) "Get a random generator type from generate--TYPE-GEN-MAP.")
-(defalias 'generate--get-generators-of-type-x (apply-partially #'map-elt generate--TYPE-GEN-MAP) "Get the vector of generators for TYPE from generate--TYPE-GEN-MAP.")
-(defalias 'generate--get-random-generator (-compose #'generate-seq-take-random-value-from-seq (apply-partially #'generate-map-random-value generate--TYPE-GEN-MAP)) "Get a random generator from generate--TYPE-GEN-MAP.")
+(defalias 'generate--get-random-generator-type (apply-partially (-compose #'generate-seq-take-random-value-from-seq #'map-keys) generate--TYPE-GEN-MAP) "Get a random generator type from `generate--TYPE-GEN-MAP'.")
+(defalias 'generate--get-generators-of-type-x (apply-partially #'map-elt generate--TYPE-GEN-MAP) "Get the vector of generators for TYPE from `generate--TYPE-GEN-MAP'.")
+(defalias 'generate--get-random-generator (-compose #'generate-seq-take-random-value-from-seq (apply-partially #'generate-map-random-value generate--TYPE-GEN-MAP)) "Get a random generator from `generate--TYPE-GEN-MAP'.")
 
 (cl-defmacro generate--create-generate-random-x ((type . generators-list))
   "Create a generate-random-x-type function for TYPE.
