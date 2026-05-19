@@ -165,13 +165,6 @@
 (defalias 'generate--not-equal (-not #'equal) "not equal?")
 (defalias 'generate--len-gt0 (-rpartial #'length> 0) "less-than-or-equal 0?")
 
-(defun generate-nth-mod (n list &optional delta)
-  "Return the N + DELTA element of LIST.
-N counts from zero.  Thanks to mod, a value will always be returned
-even if N is greater than the length of LIST."
-  (declare (side-effect-free t))
-  (nth (% (+ n (or delta 1)) (length list)) list))
-
 (defmacro generate--plural! (macro args)
   "Use ARGS to create a plural verson of MACRO."
   `(progn
@@ -759,6 +752,13 @@ and less than or equal to the given number?
   (when val
     (let ((current-time-list nil))
       (ignore-errors (when (decode-time val) 't)))))
+
+(defun generate-nth-mod (n list &optional delta)
+  "Return the N + DELTA element of LIST.
+N counts from zero.  Thanks to mod, a value will always be returned
+even if N is greater than the length of LIST."
+  (declare (side-effect-free t))
+  (nth (% (+ n (or delta 1)) (length list)) list))
 
 (defalias 'generate--divide-list-values-by-max-list-value (-compose #'generate--applify-mapcar (-juxt (-compose #'generate--applify-rpartial (apply-partially #'list #'/) #'float #'1+ #'-max) #'identity)) "Divide each value in LIST by the max value of LIST.")
 
