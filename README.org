@@ -1,8 +1,9 @@
+* *generate*
+- This packages includes a host random data generators for almost every Emacs Lisp data type.
+- This package also includes a wrapper for the ert-deftest macro called generate-ert-deftest-n-times.
+- Finally this package includes two new test-runners: `generate-run-tests-batch' and `generate-run-tests-batch-and-exit'.
+  Those functions drop in replacement for `ert-run-tests-batch' and `ert-run-tests-batch-and-exit'.
 * *Why?*
-This packages includes a host random data generators for almost every Emacs Lisp data type.
-This package also includes a wrapper for the ert-deftest macro called generate-ert-deftest-n-times.
-Finally this package includes two new test-runners, generate-run-tests-batch and generate-run-tests-batch-and-exit, drop in replacement for ert-run-tests-batch
-and ert-run-tests-batch-and-exit.
 * *Naming Conventions*
 ** generate-random-x:
 - no arguments, e.g., generate-random-vector, generate-random-string, generate-random-boolean
@@ -10,14 +11,8 @@ and ert-run-tests-batch-and-exit.
 - one argument, N, the number of y's that you want in type x, e.g., generate-list-of-n-strings, generate-list-of-n-symbols, generate-list-of-n-lisp-timestamp-ranges
 ** generate-x-y:
 optional keywords arguments, e.g., [:max-length INTEGER] [:min-length INTEGER] [:exact-length INTEGER], generate-list-of-nat-numbers, generate-list-of-floats, generate-list-of-nat-numbers-in-range
-* *Example Usage*
 * customs
 #+begin_src elisp :tangle yes
-(defgroup generate nil
-  "Random generators for testing."
-  :tag "generate"
-  :group 'lisp)
-
 (defcustom generate-lisp-timestamp-range-size generate--SECONDS-IN-A-YEAR
   "The size of the range from which random timestamps will be taken."
   :group 'generate
@@ -450,6 +445,49 @@ Each chunk will be LENGTH long."
   (funcall (-compose (-rpartial #'generate-seq-n-random-chunks-of-size-x n seq) #'generate--seq-random-chunk-length) seq))
 #+end_src
 ** map
+*** map-into
+#+begin_src emacs-lisp :tangle yes
+(defalias 'generate--map-into-alist (-rpartial #'map-into 'alist))
+(defalias 'generate--map-into-plist (-rpartial #'map-into 'plist))
+(defalias 'generate--map-into-hash-table (-rpartial #'map-into 'hash-table))
+#+end_src
+*** extensions
+**** generate-map-random-key
+#+begin_src emacs-lisp :tangle yes
+(defalias 'generate-map-random-key (-compose #'generate-seq-take-random-value-from-seq #'map-keys) "Returns one random key from MAP.
+
+\(fn MAP)")
+(defalias 'generate-seq-map-random-map-key (apply-partially #'seq-map #'generate-map-random-key) "Returns one random key from each map in SEQ.
+
+\(fn MAP)")
+#+end_src
+**** generate-map-random-value
+#+begin_src emacs-lisp :tangle yes
+(defalias 'generate-map-random-value (-compose #'generate--applify-map-elt (-juxt #'identity #'generate-map-random-key)) "Returns one random value from MAP.
+
+\(fn MAP)")
+#+end_src
+**** generate-map-random-pair
+#+begin_src emacs-lisp :tangle yes
+(defalias 'generate-map-random-pair (-compose (-juxt #'cadr #'generate--applify-map-elt) (-juxt #'identity #'generate-map-random-key)) "Returns one random key-value pair from MAP.
+
+\(fn MAP)")
+#+end_src
+**** generate-map-on
+#+begin_src emacs-lisp :tangle yes
+(defun generate--map-on (op keys-func values-func map)
+  "Apply KEYS-FUNC to the MAP keys.
+Apply VALUES-FUNC to the MAP values.
+Finally, apply OP to MAP."
+   (funcall (-compose op (-juxt (-compose keys-func #'map-keys) (-compose values-func #'map-values))) map))
+#+end_src
+**** generate--map-merge-with-plus-plist
+#+begin_src elisp :tangle yes
+(defun generate--map-merge-with-plus-plist (list-of-plists)
+  (if (length= list-of-plists 1)
+      (car list-of-plists)
+    (apply (apply-partially #'map-merge-with 'plist #'+) list-of-plists)))
+#+end_src
 ** generate-data
 #+begin_src emacs-lisp :tangle yes
 (cl-defun generate-data (&key (item-transformer #'identity) (list-transformer #'generate-shuffle-list)
@@ -540,34 +578,11 @@ Alias for `generate-random-list-of-words'.")
   "Returns a random list of strings.
 Each string is guranteed to be unique.")
 #+end_src
-*** generate--list-of-n-sentences-base
-#+begin_src emacs-lisp :tangle yes
-
-(defun generate--list-of-n-sentences-base (sentence-count &optional extra-generators)
-      "Returns a list of sentences.
-The number of lines will be equal to SENTENCE-COUNT.
-The keyword :EXTRA-GENERATORS takes a list.
-Each generator must take no arguments and a return a string.
-Each generator will be called a random number of times."
-  (-let* ((multiple (generate-random-nat-number-in-range (list 3 10)))
-      (word-count (* multiple sentence-count))
-      (list-of-regular-words (generate-list-of-n-words word-count))
-      (list-of-words-from-gens (-flatten-n 1 (generate-call-each-function-random-times extra-generators)))
-      ((sentence-slices all-words) (funcall (-compose (-juxt (-compose (apply-partially #'take sentence-count) (-rpartial #'seq-split multiple)) #'identity) #'generate-shuffle-list #'append) list-of-regular-words list-of-words-from-gens))
-      (sentences (seq-map (-compose (-rpartial #'concat ".") (apply-partially #'s-join " ")) sentence-slices)))
-    (list sentences all-words list-of-regular-words list-of-words-from-gens)))
-#+end_src
 *** generate-list-of-n-sentences
 #+begin_src emacs-lisp :tangle yes
 (defun generate-list-of-n-sentences (n)
   "Returns a list of N sentences."
   (funcall (-compose #'car #'generate--list-of-n-sentences-base) n))
-#+end_src
-*** generate--random-list-of-sentences-base
-#+begin_src emacs-lisp :tangle yes
-(defun generate--random-list-of-sentences-base ()
-  "Returns a random list of sentences."
-  (generate--list-of-n-sentences-base (generate-random-nat-number-in-range (list 3 5))))
 #+end_src
 *** generate-random-list-of-sentences
 #+begin_src emacs-lisp :tangle yes
@@ -575,38 +590,11 @@ Each generator will be called a random number of times."
   "Returns a random list of sentences."
   (funcall (-compose #'car #'generate--random-list-of-sentences-base)))
 #+end_src
-*** generate--string-with-n-lines
-#+begin_src emacs-lisp :tangle yes
-(defun generate--string-with-n-lines-base (line-count &optional extra-generators)
-  "Returns a multiline string.
-The string is formed by a joining a random list of sentences
-on new-lines.  The number of lines
-will be equal to LINE-COUNT.  The keyword
-:EXTRA-GENERATORS takes a list of functions.
-Each function must take no arguments and a
-return a string.  Each generator will be called
-a random number of times."
-  (-let* (((list-of-sentences list-of-all-words list-of-alpha-words list-of-words-from-gens) (generate--list-of-n-sentences-base line-count extra-generators)))
-    (list (s-join "\n" list-of-sentences) list-of-sentences list-of-all-words list-of-alpha-words list-of-words-from-gens)))
-#+end_src
 *** generate-string-with-n-lines
 #+begin_src emacs-lisp :tangle yes
 (defun generate-string-with-n-lines (n)
   "Returns a string with N lines."
   (funcall (-compose #'car #'generate--string-with-n-lines-base) n))
-#+end_src
-*** generate--random-multiline-string-base
-#+begin_src emacs-lisp :tangle yes
-(defun generate--random-multiline-string-base (&optional extra-generators)
-  "Returns a multiline string.
-The string is formed by a joining
-a random list of sentences on new-lines.
-The keyword :EXTRA-GENERATORS takes a
-list of functions.  Each function must
-take no arguments and a return a string.
-Each generator will be called
-a random number of times."
-  (generate--string-with-n-lines-base (generate-random-nat-number-in-range (list 2 5)) extra-generators))
 #+end_src
 *** generate-random-multiline-string
 #+begin_src emacs-lisp :tangle yes
@@ -850,15 +838,6 @@ Each timestamp will be in the
 #+begin_src elisp :tangle yes
 (defalias 'generate-random-lisp-timestamp-range-with-duration (-compose #'generate--lisp-timestamp-range-duration-helper #'generate-random-lisp-timestamp-range))
 #+end_src
-*** generate--list-of-n-lisp-timestamp-ranges-helper
-#+begin_src elisp :tangle yes
-(defun generate--list-of-n-lisp-timestamp-ranges-helper (n minus-bottom PLUS-TOP)
-    (-let* (((min hz range-length) (generate--create-timestamp-range-around-current-time minus-bottom PLUS-TOP))
-            (range-indices (generate-list-of-nat-numbers-in-range (list 0 range-length) :exact-length (* n 2)))
-            (timestamps (generate--timestamp-range-indices-to-timestamps hz min range-indices))
-            (raw-ranges (-partition 2 timestamps)))
-      (mapcar (-rpartial #'sort :key #'car) raw-ranges)))
-#+end_src
 *** generate-list-of-n-lisp-timestamp-ranges
 #+begin_src elisp :tangle yes
 (cl-defun generate-list-of-n-lisp-timestamp-ranges (n &optional (range-size generate-lisp-timestamp-range-size))
@@ -866,10 +845,6 @@ Each timestamp will be in the
 RANGE-SIZE can be used to widen or shrink the range.
 Timestamps will be in the (TICKS . HZ) format."
   (generate--list-of-n-lisp-timestamp-ranges-helper n (floor range-size 2) (floor range-size 2)))
-#+end_src
-*** generate--list-of-n-unzipped-starts-ends-durations
-#+begin_src elisp :tangle yes
-(defalias 'generate--list-of-n-unzipped-starts-ends-durations (-compose #'-unzip-lists (apply-partially #'mapcar #'generate--lisp-timestamp-range-duration-helper) #'generate-list-of-n-lisp-timestamp-ranges))
 #+end_src
 ** dates
 *** generate-random-full-dash-date-string
@@ -1027,29 +1002,8 @@ of the table."
   (generate--with-buffer-with-org-table-helper #'generate-org-table org-table-args body))
 #+end_src
 *** timestamps
-**** helpers
-***** generate--org-timestamp-string
-#+begin_src elisp :tangle yes
-(defun generate--org-timestamp-string (lisp-timestamp with-time inactive)  
-  (format-time-string
-   (org-time-stamp-format with-time inactive)
-   lisp-timestamp))
-#+end_src
-***** generate--org-timestamp
-#+begin_src elisp :tangle yes
-(cl-defun generate--org-timestamp (inactive &optional (transformer #'generate--org-timestamp-string) (type "string"))
-  (lambda (with-time)
-    (:documentation (format "Returns an %s org timestamp %s.
-
-\(fn WITH-TIME)" (if inactive "inactive" "active") type))
-    (funcall
-     transformer     
-     (generate-random-lisp-timestamp)
-     with-time
-     inactive)))
-#+end_src
 **** strings
-***** inactive
+***** inactive timestamps strings
 ****** generate-inactive-org-timestamp-string
 #+begin_src elisp :tangle yes
 (defalias 'generate-inactive-org-timestamp-string (generate--org-timestamp 't))
@@ -1060,7 +1014,7 @@ of the table."
 The timestamp may or may not have
 a start time.")
 #+end_src
-***** active
+***** active timestamps strings
 ****** generate-active-org-timestamp-string
 #+begin_src elisp :tangle yes
 (defalias 'generate-active-org-timestamp-string (generate--org-timestamp 'nil))
@@ -1111,15 +1065,6 @@ The timestamp may or may not have a
 start time.")
 #+end_src
 ** errors
-*** generate--random-void-x-error
-#+begin_src elisp :tangle yes
-(defun generate--random-void-x-error (symbol)
-  "Returns a closure that will generate a random void type error.
-SYMBOL should be void-function or void-variable."
-  (lambda ()
-    (:documentation (format "Returns a random %s error." symbol))
-    (list symbol (generate-random-symbol))))
-#+end_src
 *** generate-random-void-function-error
 #+begin_src elisp :tangle yes
 (defalias 'generate-random-void-function-error (generate--random-void-x-error 'void-function))
@@ -1198,43 +1143,6 @@ SYMBOL should be void-function or void-variable."
 (defalias 'generate-random-list-of-backtrace-frames (generate-default-convert-n-gen-to-random #'generate-list-of-n-backtrace-frames) "Returns a random list of backtrace frames.")
 #+end_src
 ** ert
-*** outcomes
-**** generate--random-ert-test-outcome
-#+begin_src elisp :tangle yes
-(defalias 'generate--random-ert-test-outcome (apply-partially #'generate-seq-take-random-value-from-seq generate--DEFAULT-OUTCOMES)
-  "Returns a random ert-test-outcome.")
-#+end_src
-**** generate--random-ert-expected-result-type
-#+begin_src elisp :tangle yes
-(defalias 'generate--random-ert-expected-result-type (apply-partially #'generate-seq-take-random-value-from-seq generate--EXPECTED-RESULT-TYPES))
-#+end_src
-**** generate--random-x-type-ert-test-outcome
-#+begin_src elisp :tangle yes
-(defun generate--random-x-type-ert-test-outcome-base (default-outcomes-plist)
-  (lambda (key expected-val)
-    (lambda ()
-      (:documentation (format "Returns a random ert-outcome whose %s equal %s." key expected-val))
-      (let ((filtered-outcomes (map-filter (lambda (_ attributes) (equal (generate--plist-get key attributes) expected-val)) default-outcomes-plist)))
-        (generate-map-random-key filtered-outcomes)))))
-
-(defalias 'generate--random-x-type-ert-test-outcome (generate--random-x-type-ert-test-outcome-base generate--DEFAULT-OUTCOMES-PLIST))
-#+end_src
-**** generate--random-exclusive-ert-test-outcome
-#+begin_src elisp :tangle yes
-(defalias 'generate--random-exclusive-ert-test-outcome (generate--random-x-type-ert-test-outcome :exclusive 't))
-#+end_src
-**** generate--random-non-exclusive-ert-test-outcome
-#+begin_src elisp :tangle yes
-(defalias 'generate--random-non-exclusive-ert-test-outcome (generate--random-x-type-ert-test-outcome :exclusive 'nil))
-#+end_src
-**** generate--random-expected-ert-test-outcome
-#+begin_src elisp :tangle yes
-(defalias 'generate--random-expected-ert-test-outcome (generate--random-x-type-ert-test-outcome :expectedp 't))
-#+end_src
-**** generate--random-unexpected-ert-test-outcome
-#+begin_src elisp :tangle yes
-(defalias 'generate--random-unexpected-ert-test-outcome (generate--random-x-type-ert-test-outcome :expectedp 'nil))
-#+end_src
 *** should
 **** should helpers
 ***** generate--make-should-form-gen-for-type-x
@@ -1360,11 +1268,6 @@ The actual asserter will be either `should' or `should-not'.")
 The actual asserter will be either `should' or `should-not'.
 The form itself may be a passing form or a failing form.")
 #+end_src
-**** generate--list-of-n-passing-should-forms-helper
-#+begin_src elisp :tangle yes
-(cl-defun generate--list-of-n-passing-should-forms-helper (val (passing assert-symbol))
-  (funcall (generate--should-form-for-type-x :passing passing :assert-symbol assert-symbol) val))
-#+end_src
 **** generate-list-of-n-passing-should-forms
 #+begin_src elisp :tangle yes
 (defun generate-list-of-n-passing-should-forms (n)
@@ -1396,36 +1299,6 @@ One of those forms will be a failing form.")
 #+begin_src elisp :tangle yes
 (defalias 'generate-random-list-of-passing-should-forms (generate-default-convert-n-gen-to-random #'generate-list-of-n-passing-should-forms)
   "Returns a random list of passing should forms.")
-#+end_src
-*** ert-test-result-condition
-**** generate--ert-test-failed-error
-#+begin_src elisp :tangle yes
-(defun generate--ert-test-failed-error (failing-should)
-    "Returns a valid `ert-test-failed' error.
-FAILING-SHOULD should be a valid `should', e.g., (should (equal x y))."
-  (list 'ert-test-failed (list failing-should :form (cadr failing-should) :value nil)))
-#+end_src
-**** generate--ert-test-failed-condition-helper
-#+begin_src elisp :tangle yes
-(defun generate--ert-test-failed-condition-helper (error-generators)
-  (lambda (failing-should)
-    (let* ((funcs (cons (apply-partially #'generate--ert-test-failed-error failing-should) error-generators)))
-      (generate-call-random-function funcs))))
-#+end_src
-**** generate--ert-test-failed-condition
-#+begin_src elisp :tangle yes
-(defalias 'generate--ert-test-failed-condition (generate--ert-test-failed-condition-helper generate--ERROR-GENERATORS)
-  "Returns a valid `ert-test-failed' condition.
-FAILED-SHOULD should be a valid `should', e.g., (should (equal x y)).
-
-\(fn FAILING-SHOULD)")
-#+end_src
-**** generate--ert-test-skipped-condition
-#+begin_src elisp :tangle yes
-(defun generate--ert-test-skipped-condition (skipped-should)
-  "Returns a valid `ert-test-skipped' condition.
-SKIPPED-SHOULD should be a valid `should', e.g., (should (equal x y))."
-  (list 'ert-test-skipped (list skipped-should :form (cadr skipped-should) :value 't)))
 #+end_src
 *** ert-test-result
 **** generate-ert-test-result-object
@@ -1468,20 +1341,6 @@ DURATION must be a number."
                                               :backtrace backtrace-frames
                                               :infos nil)))))
 #+end_src
-**** generate--plist-of-ert-test-result-objects
-#+begin_src elisp :tangle yes
-(defun generate--plist-of-ert-test-result-objects (all-outcome-duration-pairs)
-  (-flatten-n 1 (mapcar (-juxt #'car (-compose #'list (-applify #'generate-ert-test-result-object))) all-outcome-duration-pairs)))
-#+end_src
-**** generate--take-from-plist-of-ert-test-results
-#+begin_src elisp :tangle yes
-(defun generate--take-from-plist-of-ert-test-results-helper (test-plist-of-ert-test-result-objects)
-  (-lambda (outcome cnt-to-take)
-    (generate-seq-take-infinite cnt-to-take (generate--plist-get outcome test-plist-of-ert-test-result-objects))))
-
-(defun generate--take-from-plist-of-ert-test-results (test-plist-of-ert-test-result-objects test-outcomes-count-plist)
-  (funcall (-compose (apply-partially #'-flatten-n 1) #'map-apply) (generate--take-from-plist-of-ert-test-results-helper test-plist-of-ert-test-result-objects) test-outcomes-count-plist))
-#+end_src
 *** generate-ert-test
 #+begin_src elisp :tangle yes
 (cl-defun generate-ert-test (test-name &key documentation tags file-name expected-result-type)
@@ -1509,10 +1368,6 @@ the ert-test object."
 (defun generate-random-file-name ()
   "Returns a random file name."
   (concat (generate-random-word) "." (generate-random-file-extension)))
-#+end_src
-*** generate--nth-mod-file-extensions
-#+begin_src elisp :tangle yes
-(defalias 'generate--nth-mod-file-extensions (-rpartial #'generate-nth-mod generate--FILE-EXTENSIONS))
 #+end_src
 ** composite generators
 *** generate-random-value
