@@ -1921,7 +1921,6 @@ not have hlines.
 (defun generate--with-buffer-with-org-table-helper (gen gen-args body)
     "Use GEN and GEN-ARGS to create an org-table.
 Then, execute BODY in buffer with the org-table."
-  (setq org-hook 'nil)
   (cl-with-gensyms (org-table)
     `(let ((,org-table (apply #',gen ,gen-args)))
        (with-temp-buffer
