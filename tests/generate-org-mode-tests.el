@@ -41,7 +41,16 @@
 (defconst generate-TEST-SRC-BLOCK-LANGS
   (list "elisp" "emacs-lisp" "org"))
 
+(generate-ert-deftest-n-times generate--org-table-cell-values-helper ()
+  :num-runs 100
+  (-let* (((test-row-count test-column-count) (generate--two-random-nat-numbers-in-range-10))
+	  ((expected-row expected-column) (mapcar (lambda (x) (generate--random-nat-number-between-0-and x)) (list test-row-count test-column-count)))
+	  (test-val-generator (-lambda ((r c)) (format "%s,%s" (1- r) (1- c))))
+	  (actual-values (generate--org-table-cell-values-helper test-val-generator test-row-count test-column-count)))
+    (should (string-equal (nth expected-column (nth expected-row actual-values)) (format "%s,%s" expected-row expected-column)))))
+
 (generate-ert-deftest-n-times generate--org-table-without-hlines ()
+  :num-runs 100
   (-let* (((test-row-count test-column-count) (generate--two-random-nat-numbers-in-range-10))
 	  ((test-val-generator test-cell-value) (generate-random-cl-constantly))
 	  ((actual-table actual-table-values) (generate--org-table-without-hlines test-val-generator test-row-count test-column-count)))
@@ -52,6 +61,7 @@
     (should (length= (generate-seq-take-random-value-from-seq actual-table-values) test-column-count))))
 
 (generate-ert-deftest-n-times generate--org-table-with-hlines ()
+  :num-runs 100
   (-let* (((test-row-count test-column-count) (generate--two-random-nat-numbers-in-range-10))
 	  ((test-val-generator test-cell-value) (generate-random-cl-constantly))
 	  ((actual-table actual-table-values) (generate--org-table-with-hlines test-val-generator test-row-count test-column-count)))
@@ -60,6 +70,7 @@
     (should (length= (generate-seq-take-random-value-from-seq (seq-filter (apply-partially #'generate--not-equal 'hline) actual-table-values)) test-column-count))))
 
 (generate-ert-deftest-n-times generate--org-table ()
+  :num-runs 100
   (-let* (((test-row-count test-column-count) (generate--two-random-nat-numbers-in-range-10))
 	  ((test-val-generator test-cell-value) (generate-random-cl-constantly))
 	  ((actual-table actual-table-values) (generate--org-table test-val-generator test-row-count test-column-count)))
@@ -68,6 +79,7 @@
     (should (length= (generate-seq-take-random-value-from-seq (seq-filter (apply-partially #'generate--not-equal 'hline) actual-table-values)) test-column-count))))
 
 (generate-ert-deftest-n-times generate-with-buffer-with-org-table-without-hlines ()
+  :num-runs 100
   (-let* (((test-list &as test-row-count test-column-count) (generate--two-random-nat-numbers-in-range-10))
 	  ((test-row-number test-column-number) (seq-map (lambda (val) (generate-random-nat-number-in-range (list 1 val))) test-list))
 	  ((test-val-generator test-cell-value) (generate-random-cl-constantly))
@@ -77,6 +89,7 @@
     (should-not (member 'hline actual-table))))
 
 (generate-ert-deftest-n-times generate-with-buffer-with-org-table-with-hlines ()
+  :num-runs 100
   (-let* (((test-list &as test-row-count test-column-count) (generate--two-random-nat-numbers-in-range-10))
 	  ((test-row-number test-column-number) (seq-map (lambda (val) (generate-random-nat-number-in-range (list 1 val))) test-list))
 	  ((test-val-generator test-cell-value) (generate-random-cl-constantly))
@@ -85,6 +98,7 @@
     (should (string-equal actual-cell-value test-cell-value))))
 
 (generate-ert-deftest-n-times generate-with-buffer-with-org-table ()
+  :num-runs 100
   (-let* (((test-list &as test-row-count test-column-count) (generate--two-random-nat-numbers-in-range-10))
 	  ((test-row-number test-column-number) (seq-map (lambda (val) (generate-random-nat-number-in-range (list 1 val))) test-list))
 	  ((test-val-generator test-cell-value) (generate-random-cl-constantly))
@@ -141,8 +155,6 @@
     (should (string-match-p org-element--timestamp-regexp actual-timestamp))
     (should (s-starts-with-p "<" actual-timestamp))
     (should (s-ends-with-p ">" actual-timestamp))))
-
-
 
 (generate-ert-deftest-n-times generate-org-timestamp-string-with-time ()
   :num-runs 100
@@ -208,7 +220,6 @@
 (generate-ert-deftest-n-times generate-random-org-timestamp-element ()
   :num-runs 100
   (let* ((actual-element (generate-random-org-timestamp-element)))
-    (print actual-element)
     (should (org-element-type-p actual-element 'timestamp))))
 
 ;; Local Variables:

@@ -331,10 +331,10 @@ If NUM-RUNS is not specified, your test will be defined 100 times.
 	(generate--parse-keys-and-body docstring-keys-and-body)
       `(cl-macrolet ((skip-when (form) `(ert--skip-when ,form))
 		     (skip-unless (form) `(ert--skip-unless ,form)))
-	 (dotimes (run-symbol ,num-runs)
-	   (ert-set-test (intern (format "%s-%s-%s" ',name generate--TEST-IDENTIFIER run-symbol))
+	 (dotimes (,run-symbol ,num-runs)
+	   (ert-set-test (intern (format "%s-%s-%s" ',name generate--TEST-IDENTIFIER ,run-symbol))
 			 (make-ert-test
-			  :name (intern (format "%s-%s-%s" ',name generate--TEST-IDENTIFIER run-symbol))
+			  :name (intern (format "%s-%s-%s" ',name generate--TEST-IDENTIFIER ,run-symbol))
 			  ,@(when documentation-supplied-p
 			      `(:documentation ,documentation))
 			  ,@(when expected-result-supplied-p
@@ -1843,13 +1843,13 @@ Each string is an org-table row.
 
 \(fn LIST)")
 
-(defun generate--org-table-val-generator-caller (val-generator rows columns cell-num)
+(defun generate--org-table-val-generator-caller (val-generator columns cell-num)
   (let ((current-col (1+ (% cell-num columns)))
 	(current-row (1+ (floor cell-num columns))))
   (funcall val-generator (list current-row current-col))))
 
 (defun generate--org-table-cell-values-helper (val-generator rows columns)
- (funcall (-compose (apply-partially #'-partition columns) (-rpartial #'generate--times (apply-partially #'generate--org-table-val-generator-caller val-generator rows columns)) #'*) rows columns))
+ (funcall (-compose (apply-partially #'-partition columns) (-rpartial #'generate--times (apply-partially #'generate--org-table-val-generator-caller val-generator columns)) #'*) rows columns))
 
 (defun generate--org-table-without-hlines (val-generator rows columns)
   "Use ROWS, COLUMNS and VAL-GENERATOR to create an org-table.
