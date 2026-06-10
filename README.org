@@ -48,10 +48,10 @@ If NUM-RUNS is not specified, your test will be defined 100 times.
         (generate--parse-keys-and-body docstring-keys-and-body)
       `(cl-macrolet ((skip-when (form) `(ert--skip-when ,form))
                      (skip-unless (form) `(ert--skip-unless ,form)))
-         (dotimes (run-symbol ,num-runs)
-           (ert-set-test (intern (format "%s-%s-%s" ',name generate--TEST-IDENTIFIER run-symbol))
+         (dotimes (,run-symbol ,num-runs)
+           (ert-set-test (intern (format "%s-%s-%s" ',name generate--TEST-IDENTIFIER ,run-symbol))
                          (make-ert-test
-                          :name (intern (format "%s-%s-%s" ',name generate--TEST-IDENTIFIER run-symbol))
+                          :name (intern (format "%s-%s-%s" ',name generate--TEST-IDENTIFIER ,run-symbol))
                           ,@(when documentation-supplied-p
                               `(:documentation ,documentation))
                           ,@(when expected-result-supplied-p
@@ -60,44 +60,6 @@ If NUM-RUNS is not specified, your test will be defined 100 times.
                               `(:tags ,tags))
                           :body (lambda () ,body nil)
                           :file-name ,(or (macroexp-file-name) buffer-file-name))))))))
-#+end_src
-** generate-run-tests-batch
-#+begin_src elisp :tangle yes
-;;;###autoload
-(defun generate-run-tests-batch (&optional selector)
-    "Run the tests specified by SELECTOR, printing results to the terminal.
-
-SELECTOR selects which tests to run as described in `ert-select-tests' when
-called with its second argument t, except if SELECTOR is nil, in which case
-all tests rather than none will be run; this makes the command line
- \"emacs -batch -l my-tests.el -f generate-run-tests-batch-and-exit\" useful.
-
-Returns the stats object.
-
-This is generate's implementation of `ert-run-tests-batch'."
-  (let* ((tests (ert-select-tests selector t))
-         (tests-groups-alist (generate--create-tests-groups-alist tests))
-         (listener (generate--create-run-tests-batch-listener selector tests-groups-alist)))
-    (ert-run-tests selector listener)))
-#+end_src
-** generate-run-tests-batch-and-exit
-#+begin_src elisp :tangle yes
-;;;###autoload
-(cl-defun generate-run-tests-batch-and-exit (&optional (selector t))
-    "Like `generate-run-tests-batch', but exits Emacs when done.
-
-The exit status will be 0 if all test results were as expected, 1
-on unexpected results, or 2 if the tool detected an error outside
-of the tests (e.g. invalid SELECTOR or bug in the code that runs
-the tests).
-
-This is generate's implementation of `ert-run-tests-batch-and-exit'."
-  (let ((tests (ert-select-tests selector t)))
-    (cl-letf (((symbol-function 'ert-run-tests-batch)
-               (symbol-function 'generate-run-tests-batch))
-              ((symbol-function 'ert-select-tests)
-               (lambda (&rest _) tests)))
-      (ert-run-tests-batch-and-exit selector))))
 #+end_src
 * Utilities
 * generators
@@ -694,8 +656,6 @@ or simply :EXACT-LENGTH.
 (defalias 'generate-random-vector-of-strings (-compose #'generate--applify-vector #'generate-random-list-of-strings) "Returns a random vector of strings.")
 
 (defalias 'generate-random-vector-of-lists-nat-numbers (apply-partially #'generate-data :list-transformer (-compose #'generate--applify-vector #'generate-seq-split-random)) "Returns a random vector of lists of natural numbers.")
-
-(defalias 'generate-random-vector-of-vectors-nat-numbers (-compose #'generate--seq-map-vector #'generate-random-vector-of-lists-nat-numbers) "Returns a random vector of vectors of natural numbers.")
 #+end_src
 ** alists - make sure the string generators are correct
 #+begin_src emacs-lisp :tangle yes
@@ -786,7 +746,7 @@ The cdr will b a vector.")
 ** booleans
 *** generate-random-boolean
 #+begin_src emacs-lisp :tangle yes
-(defalias 'generate-random-boolean (apply-partially #'generate-seq-take-random-value-from-seq (list 't 'nil))
+(defalias 'generate-random-boolean (apply-partially #'generate-seq-take-random-value-from-seq (list t nil))
   "Returns a random boolean.")
 #+end_src
 *** generate-list-of-n-booleans
@@ -1006,7 +966,7 @@ of the table."
 ***** inactive timestamps strings
 ****** generate-inactive-org-timestamp-string
 #+begin_src elisp :tangle yes
-(defalias 'generate-inactive-org-timestamp-string (generate--org-timestamp 't))
+(defalias 'generate-inactive-org-timestamp-string (generate--org-timestamp t))
 #+end_src
 ****** generate-random-inactive-org-timestamp-string
 #+begin_src elisp :tangle yes
@@ -1017,7 +977,7 @@ a start time.")
 ***** active timestamps strings
 ****** generate-active-org-timestamp-string
 #+begin_src elisp :tangle yes
-(defalias 'generate-active-org-timestamp-string (generate--org-timestamp 'nil))
+(defalias 'generate-active-org-timestamp-string (generate--org-timestamp nil))
 #+end_src
 ****** generate-random-active-org-timestamp-string
 #+begin_src elisp :tangle yes
@@ -1043,11 +1003,11 @@ start time.")
 **** org-elements
 ***** generate-random-inactive-org-timestamp-element
 #+begin_src elisp :tangle yes
-(defalias 'generate-random-inactive-org-timestamp-element (generate--org-timestamp 't #'org-timestamp-from-time "element"))
+(defalias 'generate-random-inactive-org-timestamp-element (generate--org-timestamp t #'org-timestamp-from-time "element"))
 #+end_src
 ***** generate-random-active-org-timestamp-element
 #+begin_src elisp :tangle yes
-(defalias 'generate-random-active-org-timestamp-element (generate--org-timestamp 'nil #'org-timestamp-from-time "element"))
+(defalias 'generate-random-active-org-timestamp-element (generate--org-timestamp nil #'org-timestamp-from-time "element"))
 #+end_src
 ***** generate-org-timestamp-element
 #+begin_src elisp :tangle yes
@@ -1236,12 +1196,12 @@ start time.")
 #+end_src
 **** generate-failing-should-form
 #+begin_src elisp :tangle yes
-(defalias 'generate-failing-should-form (generate--should-form-for-type-x :passing 'nil :assert-symbol 'should)
+(defalias 'generate-failing-should-form (generate--should-form-for-type-x :passing nil :assert-symbol 'should)
   "Returns a random failing should form.")
 #+end_src
 **** generate-failing-should-not-form
 #+begin_src elisp :tangle yes
-(defalias 'generate-failing-should-not-form (generate--should-form-for-type-x :passing 'nil :assert-symbol 'should-not)
+(defalias 'generate-failing-should-not-form (generate--should-form-for-type-x :passing nil :assert-symbol 'should-not)
   "Returns a random failing should-not form.")
 #+end_src
 **** generate-random-passing-should
@@ -1275,8 +1235,8 @@ The form itself may be a passing form or a failing form.")
   (let* ((vals (generate-list-of-n-random-values n))
          (should-count (generate--random-nat-number-between-0-and n))
          (should-not-count (- n should-count))
-         (shoulds (generate-seq-take-infinite should-count (list (list 't 'should))))
-         (should-nots (generate-seq-take-infinite should-not-count (list (list 't 'should-not))))
+         (shoulds (generate-seq-take-infinite should-count (list (list t 'should))))
+         (should-nots (generate-seq-take-infinite should-not-count (list (list t 'should-not))))
          (all-should-args (generate-append-and-shuffle shoulds should-nots)))
     (-zip-with #'generate--list-of-n-passing-should-forms-helper vals all-should-args)))
 #+end_src
@@ -1369,51 +1329,6 @@ the ert-test object."
   "Returns a random file name."
   (concat (generate-random-word) "." (generate-random-file-extension)))
 #+end_src
-** composite generators
-*** generate-random-value
-#+begin_src emacs-lisp :tangle yes
-(defalias 'generate-random-value (-compose #'funcall #'generate--get-random-generator) "Returns a random value.")
-#+end_src
-#+begin_src org :title "generate-random-%s" :docstring "Returns one random %s." :headline-level 2 :items-headline-level 2
-number
-list
-hash-table
-vector
-alist
-plist
-seq
-map
-#+end_src
-#+begin_src org :title generate-random-%s-type-n-times :docstring "Returns an N-length list of random %ss."
-number
-list
-hash-table
-vector
-alist
-plist
-seq
-map
-#+end_src
-#+begin_src org :title generate-random-%s-type-twice :docstring "Returns a list with two random %ss."
-number
-list
-hash-table
-vector
-alist
-plist
-seq
-map
-#+end_src
-#+begin_src org :title generate-random-%s-type-n-random-times :docstring "Returns a list with a random amount of %ss."
-number
-list
-hash-table
-vector
-alist
-plist
-seq
-map
-#+end_src
 ** misc
 *** generate-random-punctuation
 #+begin_src emacs-lisp :tangle yes
@@ -1435,4 +1350,173 @@ Values are hexadecimals."
 *** generate-random-list-of-colors
 #+begin_src elisp :tangle yes
 (defalias 'generate-random-list-of-colors (generate-default-convert-n-gen-to-random #'generate-list-of-n-colors))
+#+end_src
+** composite generators
+*** numbers
+**** generate-random-number
+#+begin_src elisp :tangle yes
+(defalias 'generate-random-number (apply-partially #'generate-call-random-function generate--NUMBER-GENS) "Returns a random number.")
+#+end_src
+**** generate-list-of-n-numbers
+#+begin_src elisp :tangle yes
+(defalias 'generate-list-of-n-numbers (-rpartial #'generate-call-random-function-n-times generate--NUMBER-GENS) "Returns a random list of number.
+The list will have N numbers.
+
+
+\(fn N)")
+#+end_src
+**** generate-random-number-type-twice
+#+begin_src elisp :tangle yes
+(defalias 'generate-random-number-type-twice (apply-partially #'generate-call-random-function-n-times 2 generate--NUMBER-GENS) "Returns two random numbers.")
+#+end_src
+**** generate-random-list-of-numbers
+#+begin_src elisp :tangle yes
+(defalias 'generate-random-list-of-numbers (apply-partially #'generate-call-random-function-random-times generate--NUMBER-GENS) "Returns a random list of numbers.")
+#+end_src
+*** lists
+**** generate-random-list
+#+begin_src elisp :tangle yes
+(defalias 'generate-random-list (apply-partially #'generate-call-random-function generate--LIST-GENS) "Returns a random list.")
+#+end_src
+**** generate-list-of-n-lists
+#+begin_src elisp :tangle yes
+(defalias 'generate-list-of-n-lists (-rpartial #'generate-call-random-function-n-times generate--LIST-GENS) "Returns a random list of list.
+The list will have N lists.
+
+
+\(fn N)")
+#+end_src
+**** generate-random-list-type-twice
+#+begin_src elisp :tangle yes
+(defalias 'generate-random-list-type-twice (apply-partially #'generate-call-random-function-n-times 2 generate--LIST-GENS) "Returns two random lists.")
+#+end_src
+**** generate-random-list-of-lists
+#+begin_src elisp :tangle yes
+(defalias 'generate-random-list-of-lists (apply-partially #'generate-call-random-function-random-times generate--LIST-GENS) "Returns a random list of lists.")
+#+end_src
+*** vectors
+**** generate-random-vector
+#+begin_src elisp :tangle yes
+(defalias 'generate-random-vector (apply-partially #'generate-call-random-function generate--VECTOR-GENS) "Returns a random vector.")
+#+end_src
+**** generate-list-of-n-vectors
+#+begin_src elisp :tangle yes
+(defalias 'generate-list-of-n-vectors (-rpartial #'generate-call-random-function-n-times generate--VECTOR-GENS) "Returns a random list of vector.
+The list will have N vectors.
+
+
+\(fn N)")
+#+end_src
+**** generate-random-vector-type-twice
+#+begin_src elisp :tangle yes
+(defalias 'generate-random-vector-type-twice (apply-partially #'generate-call-random-function-n-times 2 generate--VECTOR-GENS) "Returns two random vectors.")
+#+end_src
+**** generate-random-list-of-vectors
+#+begin_src elisp :tangle yes
+(defalias 'generate-random-list-of-vectors (apply-partially #'generate-call-random-function-random-times generate--VECTOR-GENS) "Returns a random list of vectors.")
+#+end_src
+*** alists
+**** generate-random-alist
+#+begin_src elisp :tangle yes
+(defalias 'generate-random-alist (apply-partially #'generate-call-random-function generate--ALIST-GENS) "Returns a random alist.")
+#+end_src
+**** generate-list-of-n-alists
+#+begin_src elisp :tangle yes
+(defalias 'generate-list-of-n-alists (-rpartial #'generate-call-random-function-n-times generate--ALIST-GENS) "Returns a random list of alist.
+The list will have N alists.
+
+
+\(fn N)")
+#+end_src
+**** generate-random-alist-type-twice
+#+begin_src elisp :tangle yes
+(defalias 'generate-random-alist-type-twice (apply-partially #'generate-call-random-function-n-times 2 generate--ALIST-GENS) "Returns two random alists.")
+#+end_src
+**** generate-random-list-of-alists
+#+begin_src elisp :tangle yes
+(defalias 'generate-random-list-of-alists (apply-partially #'generate-call-random-function-random-times generate--ALIST-GENS) "Returns a random list of alists.")
+#+end_src
+*** plists
+**** generate-random-plist
+#+begin_src elisp :tangle yes
+(defalias 'generate-random-plist (apply-partially #'generate-call-random-function generate--PLIST-GENS) "Returns a random plist.")
+#+end_src
+**** generate-list-of-n-plists
+#+begin_src elisp :tangle yes
+(defalias 'generate-list-of-n-plists (-rpartial #'generate-call-random-function-n-times generate--PLIST-GENS) "Returns a random list of plist.
+The list will have N plists.
+
+
+\(fn N)")
+#+end_src
+**** generate-random-plist-type-twice
+#+begin_src elisp :tangle yes
+(defalias 'generate-random-plist-type-twice (apply-partially #'generate-call-random-function-n-times 2 generate--PLIST-GENS) "Returns two random plists.")
+#+end_src
+**** generate-random-list-of-plists
+#+begin_src elisp :tangle yes
+(defalias 'generate-random-list-of-plists (apply-partially #'generate-call-random-function-random-times generate--PLIST-GENS) "Returns a random list of plists.")
+#+end_src
+*** hash-tables
+**** generate-random-hash-table
+#+begin_src elisp :tangle yes
+(defalias 'generate-random-hash-table (apply-partially #'generate-call-random-function generate--HASH-TABLE-GENS) "Returns a random hash-table.")
+#+end_src
+**** generate-list-of-n-hash-tables
+#+begin_src elisp :tangle yes
+(defalias 'generate-list-of-n-hash-tables (-rpartial #'generate-call-random-function-n-times generate--HASH-TABLE-GENS) "Returns a random list of hash-table.
+The list will have N hash-tables.
+
+
+\(fn N)")
+#+end_src
+**** generate-random-hash-table-type-twice
+#+begin_src elisp :tangle yes
+(defalias 'generate-random-hash-table-type-twice (apply-partially #'generate-call-random-function-n-times 2 generate--HASH-TABLE-GENS) "Returns two random hash-tables.")
+#+end_src
+**** generate-random-list-of-hash-tables
+#+begin_src elisp :tangle yes
+(defalias 'generate-random-list-of-hash-tables (apply-partially #'generate-call-random-function-random-times generate--HASH-TABLE-GENS) "Returns a random list of hash-tables.")
+#+end_src
+*** seqs
+**** generate-random-seq
+#+begin_src elisp :tangle yes
+(defalias 'generate-random-seq (apply-partially #'generate-call-random-function generate--SEQ-GENS) "Returns a random seq.")
+#+end_src
+**** generate-list-of-n-seqs
+#+begin_src elisp :tangle yes
+(defalias 'generate-list-of-n-seqs (-rpartial #'generate-call-random-function-n-times generate--SEQ-GENS) "Returns a random list of seq.
+The list will have N seqs.
+
+
+\(fn N)")
+#+end_src
+**** generate-random-seq-type-twice
+#+begin_src elisp :tangle yes
+(defalias 'generate-random-seq-type-twice (apply-partially #'generate-call-random-function-n-times 2 generate--SEQ-GENS) "Returns two random seqs.")
+#+end_src
+**** generate-random-list-of-seqs
+#+begin_src elisp :tangle yes
+(defalias 'generate-random-list-of-seqs (apply-partially #'generate-call-random-function-random-times generate--SEQ-GENS) "Returns a random list of seqs.")
+#+end_src
+*** maps
+**** generate-random-map
+#+begin_src elisp :tangle yes
+(defalias 'generate-random-map (apply-partially #'generate-call-random-function generate--MAP-GENS) "Returns a random map.")
+#+end_src
+**** generate-list-of-n-maps
+#+begin_src elisp :tangle yes
+(defalias 'generate-list-of-n-maps (-rpartial #'generate-call-random-function-n-times generate--MAP-GENS) "Returns a random list of map.
+The list will have N maps.
+
+
+\(fn N)")
+#+end_src
+**** generate-random-map-type-twice
+#+begin_src elisp :tangle yes
+(defalias 'generate-random-map-type-twice (apply-partially #'generate-call-random-function-n-times 2 generate--MAP-GENS) "Returns two random maps.")
+#+end_src
+**** generate-random-list-of-maps
+#+begin_src elisp :tangle yes
+(defalias 'generate-random-list-of-maps (apply-partially #'generate-call-random-function-random-times generate--MAP-GENS) "Returns a random list of maps.")
 #+end_src
