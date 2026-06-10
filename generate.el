@@ -2376,95 +2376,218 @@ Values are hexadecimals."
 (defconst generate--MAP-GENS
   (vconcat generate--LIST-GENS generate--HASH-TABLE-GENS generate--LIST-GENS))
 
+(defconst generate--ALL-GENS
+  (vconcat generate--NUMBER-GENS
+	   generate--STRING-GENS
+	   generate--LIST-GENS
+	   generate--HASH-TABLE-GENS
+	   generate--VECTOR-GENS
+	   generate--ALIST-GENS
+	   generate--PLIST-GENS
+	   generate--SEQ-GENS
+	   generate--MAP-GENS))
 
 (defconst generate--TYPE-GEN-MAP
   (list
-   (cons "number" generate--NUMBER-GENS)
-   (cons "list" generate--LIST-GENS)
-   (cons "vector" generate--VECTOR-GENS)
-   (cons "alist" generate--ALIST-GENS)
-   (cons "plist" generate--PLIST-GENS)
-   (cons "hash-table" generate--HASH-TABLE-GENS)
-   (cons "seq" generate--SEQ-GENS)
-   (cons "map" generate--MAP-GENS))
-  "Each type of generator in this list will available at run time.")
+   (cons "number" 'generate--NUMBER-GENS)
+   (cons "list" 'generate--LIST-GENS)
+   (cons "vector" 'generate--VECTOR-GENS)
+   (cons "alist" 'generate--ALIST-GENS)
+   (cons "plist" 'generate--PLIST-GENS)
+   (cons "hash-table" 'generate--HASH-TABLE-GENS)
+   (cons "seq" 'generate--SEQ-GENS)
+   (cons "map" 'generate--MAP-GENS))
+  "Each type of generator in this will be programmatically generated.
+Variables are quoted in order to prevent expansion
+when we programatically generate these generators.")
 
-(defalias 'generate--get-random-generator-type (apply-partially (-compose #'generate-seq-take-random-value-from-seq #'map-keys) generate--TYPE-GEN-MAP) "Get a random generator type from `generate--TYPE-GEN-MAP'.")
-(defalias 'generate--get-generators-of-type-x (apply-partially #'map-elt generate--TYPE-GEN-MAP) "Get the vector of generators for TYPE from `generate--TYPE-GEN-MAP'.")
-(defalias 'generate--get-random-generator (-compose #'generate-seq-take-random-value-from-seq (apply-partially #'generate-map-random-value generate--TYPE-GEN-MAP)) "Get a random generator from `generate--TYPE-GEN-MAP'.")
-
-(cl-defmacro generate--create-generate-random-x ((type . generators-list))
+(defun generate--create-generate-random-x (type generators-list)
   "Create a generate-random-x-type function for TYPE.
 When the resulting function is called,
 generate-call-random-function
 will select a function from GENERATORS-LIST."
-  (cl-with-gensyms (alias-name)
-    `(let ((,alias-name (intern (format "generate-random-%s" ,type))))
-       (defalias ,alias-name (apply-partially #'generate-call-random-function ,generators-list)))))
+  (let* ((alias-name (format "generate-random-%s" type))
+	 (docstring (format "Returns a random %s." type))
+	 (alias (format "(defalias '%s (apply-partially #'generate-call-random-function %s) \"%s\")" alias-name generators-list docstring)))
+    (list alias-name alias)))
 
-(cl-defmacro generate--create-list-of-n-xs ((type . generators-list))
+(defun generate--create-list-of-n-xs (type generators-list)
   "Create a generate-list-of-n-xs function for TYPE.
 When the resulting function is called,
 generate-call-random-function-n-times
 will select a function from GENERATORS-LIST."
-  (cl-with-gensyms (alias-name)
-    `(let ((,alias-name (intern (format "generate-list-of-n-%ss" ,type))))
-       (defalias ,alias-name (-rpartial #'generate-call-random-function-n-times ,generators-list)))))
+  (let* ((alias-name (format "generate-list-of-n-%ss" type))
+	 (docstring-line-one (format "Returns a random list of %s." type))
+	 (docstring-line-two (format "The list will have N %ss." type))
+	 (docstring (s-join "\n" (list docstring-line-one docstring-line-two "\n" "\\(fn N)")))
+	 (alias (format "(defalias '%s (-rpartial #'generate-call-random-function-n-times %s) \"%s\")"
+			alias-name generators-list docstring)))
+    (list alias-name alias)))
 
-(cl-defmacro generate--create-generate-random-x-type-twice ((type . generators-list))
+(defun generate--create-generate-random-x-type-twice (type generators-list)
   "Create a generate-random-x-type-twice function for TYPE.
 When the resulting function is called,
 generate-call-random-function-n-times
 will select a function from GENERATORS-LIST.
 The selected function will be called twice."
-  (cl-with-gensyms (alias-name)
-    `(let ((,alias-name (intern (format "generate-random-%s-type-twice" ,type))))
-       (defalias ,alias-name (apply-partially #'generate-call-random-function-n-times 2 ,generators-list)))))
+  (let* ((alias-name (format "generate-random-%s-type-twice" type))
+	 (docstring (format "Returns two random %ss." type))
+	 (alias (format "(defalias '%s (apply-partially #'generate-call-random-function-n-times 2 %s) \"%s\")"
+			alias-name generators-list docstring)))
+    (list alias-name alias)))
 
-(cl-defmacro generate--create-random-list-of-xs ((type . generators-list))
+(defun generate--create-random-list-of-xs (type generators-list)
   "Create a generate-random-list-of-xs function for TYPE.
 When the resulting function is called,
 generate-call-random-function-random-times
 will select a function from GENERATORS-LIST.
 The selected function will be
 called a random amount of times."
-  (cl-with-gensyms (alias-name)
-    `(let ((,alias-name (intern (format "generate-random-list-of-%ss" ,type))))
-       (defalias ,alias-name (apply-partially #'generate-call-random-function-random-times ,generators-list)))))
+  (let* ((alias-name (format "generate-random-list-of-%ss" type))
+	 (docstring (format "Returns a random list of %ss." type))
+	 (alias (format "(defalias '%s (apply-partially #'generate-call-random-function-random-times %s) \"%s\")"
+			alias-name generators-list docstring)))
+    (list alias-name alias)))
 
-(defmacro generate--create-list-of-generate-random-x (args)
-  "Call generate--create-generate-random-x for each cons cell in ARGS."
-  `(generate--plural! generate--create-generate-random-x ,args))
+(defconst generate-COMPOSITE-GENERATORS-GENERATORS
+  (list
+   #'generate--create-generate-random-x
+   #'generate--create-list-of-n-xs
+   #'generate--create-generate-random-x-type-twice
+   #'generate--create-random-list-of-xs))
 
-(defmacro generate--create-list-of-generate--create-list-of-n-xs (args)
-  "Call generate-list-of-n-xs for each cons cell in ARGS."
-  `(generate--plural! generate--create-list-of-n-xs ,args))
+(defun generate--generate-composite-generators-tree-for-type-x (subheading-stars src-block-start src-block-end type gens)
+  (lambda (alias-creator)
+    (-let (((alias-name alias) (funcall alias-creator type gens)))
+      (concat subheading-stars " " alias-name  "\n" src-block-start "\n" alias "\n" src-block-end))))
 
-(defmacro generate--create-list-of-generate-random-x-type-twice (args)
-  "Call generate--create-generate-random-x-type-twice for each cons cell in ARGS."
-  `(generate--plural! generate--create-generate-random-x-type-twice ,args))
+(defun generate--generate-composite-generators-for-type-x (function-creators top-level-stars subheading-stars src-block-start src-block-end)
+  "Returns a function that will create a list of functons.
+Each function in FUNCTION-CREATORS should be a list of functions."
+  (lambda (type gens)
+    (let ((funcs-list (mapconcat (generate--generate-composite-generators-tree-for-type-x subheading-stars src-block-start src-block-end type gens) function-creators "\n"))
+	  (top-level-heading (concat top-level-stars " " type "s" " ")))
+      (concat top-level-heading "\n" funcs-list))))
 
-(defmacro generate--create-list-of-generate--create-random-list-of-xs (args)
-  "Call generate-random-list-of-xs for each cons cell in ARGS."
-  `(generate--plural! generate--create-random-list-of-xs ,args))
+(defun generate--generate-composite-generators-base (function-creators type-generator-mapping heading-level)
+  "Returns a function that will add functions to a buffer.
+FUNCTION-CREATORS should be a list of functions that
+will create composite generators.  TYPE-GENERATOR-MAPPING
+should be a mapping of types to a list of generator functions.
+HEADING-LEVEL should be the top level of each group."
+  (lambda ()
+    (let* ((top-level-stars (make-string heading-level ?*))
+	   (subheading-stars (make-string (1+ heading-level) ?*))
+	   (src-block-start "#+begin_src elisp :tangle yes")
+	   (src-block-end "#+end_src")
+	   (list-of-funcs (map-apply (generate--generate-composite-generators-for-type-x
+				      function-creators
+				      top-level-stars
+				      subheading-stars
+				      src-block-start
+				      src-block-end)
+				     type-generator-mapping)))
+      (funcall (-compose (apply-partially #'s-join "\n\n") #'flatten-tree) list-of-funcs))))
 
-;; Make functions available at run time
-(generate--create-list-of-generate-random-x generate--TYPE-GEN-MAP)
-(generate--create-list-of-generate--create-list-of-n-xs generate--TYPE-GEN-MAP)
-(generate--create-list-of-generate-random-x-type-twice generate--TYPE-GEN-MAP)
-(generate--create-list-of-generate--create-random-list-of-xs generate--TYPE-GEN-MAP)
+(defalias 'generate--generate-composite-generators (generate--generate-composite-generators-base generate-COMPOSITE-GENERATORS-GENERATORS generate--TYPE-GEN-MAP 3))
 
-(defalias 'generate-random-value (-compose #'funcall #'generate--get-random-generator) "Returns a random value.")
+(defalias 'generate-random-number (apply-partially #'generate-call-random-function generate--NUMBER-GENS) "Returns a random number.")
 
-(defalias 'generate-random-punctuation (apply-partially #'generate-seq-take-random-value-from-seq generate--PUNCTUATION) "Returns a random member of generate-PUNCTUATION.")
+(defalias 'generate-list-of-n-numbers (-rpartial #'generate-call-random-function-n-times generate--NUMBER-GENS) "Returns a random list of number.
+The list will have N numbers.
 
-(defalias 'generate-random-color (-compose (-applify #'color-rgb-to-hex) (apply-partially #'generate-list-of-floats-between-0-and-1 :exact-length 3)))
+
+\(fn N)")
+
+(defalias 'generate-random-number-type-twice (apply-partially #'generate-call-random-function-n-times 2 generate--NUMBER-GENS) "Returns two random numbers.")
+
+(defalias 'generate-random-list-of-numbers (apply-partially #'generate-call-random-function-random-times generate--NUMBER-GENS) "Returns a random list of numbers.")
 
 (defalias 'generate-random-list (apply-partially #'generate-call-random-function generate--LIST-GENS) "Returns a random list.")
 
-(defalias 'generate-random-list-of-colors (generate-default-convert-n-gen-to-random #'generate-list-of-n-colors))
+(defalias 'generate-list-of-n-lists (-rpartial #'generate-call-random-function-n-times generate--LIST-GENS) "Returns a random list of list.
+The list will have N lists.
 
 
+\(fn N)")
+
+(defalias 'generate-random-list-type-twice (apply-partially #'generate-call-random-function-n-times 2 generate--LIST-GENS) "Returns two random lists.")
+
+(defalias 'generate-random-list-of-lists (apply-partially #'generate-call-random-function-random-times generate--LIST-GENS) "Returns a random list of lists.")
+
+(defalias 'generate-random-vector (apply-partially #'generate-call-random-function generate--VECTOR-GENS) "Returns a random vector.")
+
+(defalias 'generate-list-of-n-vectors (-rpartial #'generate-call-random-function-n-times generate--VECTOR-GENS) "Returns a random list of vector.
+The list will have N vectors.
+
+
+\(fn N)")
+
+(defalias 'generate-random-vector-type-twice (apply-partially #'generate-call-random-function-n-times 2 generate--VECTOR-GENS) "Returns two random vectors.")
+
+(defalias 'generate-random-list-of-vectors (apply-partially #'generate-call-random-function-random-times generate--VECTOR-GENS) "Returns a random list of vectors.")
+
+(defalias 'generate-random-alist (apply-partially #'generate-call-random-function generate--ALIST-GENS) "Returns a random alist.")
+
+(defalias 'generate-list-of-n-alists (-rpartial #'generate-call-random-function-n-times generate--ALIST-GENS) "Returns a random list of alist.
+The list will have N alists.
+
+
+\(fn N)")
+
+(defalias 'generate-random-alist-type-twice (apply-partially #'generate-call-random-function-n-times 2 generate--ALIST-GENS) "Returns two random alists.")
+
+(defalias 'generate-random-list-of-alists (apply-partially #'generate-call-random-function-random-times generate--ALIST-GENS) "Returns a random list of alists.")
+
+(defalias 'generate-random-plist (apply-partially #'generate-call-random-function generate--PLIST-GENS) "Returns a random plist.")
+
+(defalias 'generate-list-of-n-plists (-rpartial #'generate-call-random-function-n-times generate--PLIST-GENS) "Returns a random list of plist.
+The list will have N plists.
+
+
+\(fn N)")
+
+(defalias 'generate-random-plist-type-twice (apply-partially #'generate-call-random-function-n-times 2 generate--PLIST-GENS) "Returns two random plists.")
+
+(defalias 'generate-random-list-of-plists (apply-partially #'generate-call-random-function-random-times generate--PLIST-GENS) "Returns a random list of plists.")
+
+(defalias 'generate-random-hash-table (apply-partially #'generate-call-random-function generate--HASH-TABLE-GENS) "Returns a random hash-table.")
+
+(defalias 'generate-list-of-n-hash-tables (-rpartial #'generate-call-random-function-n-times generate--HASH-TABLE-GENS) "Returns a random list of hash-table.
+The list will have N hash-tables.
+
+
+\(fn N)")
+
+(defalias 'generate-random-hash-table-type-twice (apply-partially #'generate-call-random-function-n-times 2 generate--HASH-TABLE-GENS) "Returns two random hash-tables.")
+
+(defalias 'generate-random-list-of-hash-tables (apply-partially #'generate-call-random-function-random-times generate--HASH-TABLE-GENS) "Returns a random list of hash-tables.")
+
+(defalias 'generate-random-seq (apply-partially #'generate-call-random-function generate--SEQ-GENS) "Returns a random seq.")
+
+(defalias 'generate-list-of-n-seqs (-rpartial #'generate-call-random-function-n-times generate--SEQ-GENS) "Returns a random list of seq.
+The list will have N seqs.
+
+
+\(fn N)")
+
+(defalias 'generate-random-seq-type-twice (apply-partially #'generate-call-random-function-n-times 2 generate--SEQ-GENS) "Returns two random seqs.")
+
+(defalias 'generate-random-list-of-seqs (apply-partially #'generate-call-random-function-random-times generate--SEQ-GENS) "Returns a random list of seqs.")
+
+(defalias 'generate-random-map (apply-partially #'generate-call-random-function generate--MAP-GENS) "Returns a random map.")
+
+(defalias 'generate-list-of-n-maps (-rpartial #'generate-call-random-function-n-times generate--MAP-GENS) "Returns a random list of map.
+The list will have N maps.
+
+
+\(fn N)")
+
+(defalias 'generate-random-map-type-twice (apply-partially #'generate-call-random-function-n-times 2 generate--MAP-GENS) "Returns two random maps.")
+
+(defalias 'generate-random-list-of-maps (apply-partially #'generate-call-random-function-random-times generate--MAP-GENS) "Returns a random list of maps.")
+
+(defalias 'generate-random-value (-partial #'generate-call-random-function generate--ALL-GENS) "Returns a random value.")
 
 (provide 'generate)
 ;;; generate.el ends here
