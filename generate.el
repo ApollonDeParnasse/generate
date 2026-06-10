@@ -344,6 +344,16 @@ If NUM-RUNS is not specified, your test will be defined 100 times.
 			  :body (lambda () ,body nil)
 			  :file-name ,(or (macroexp-file-name) buffer-file-name))))))))
 
+(defun generate--activate-font-lock-keywords ()
+"Activate font-lock keywords for some of ERT's symbols."
+(font-lock-add-keywords
+ nil
+ '(("(\\(\\<generate-ert-deftest-n-times\\)\\>\\s *\\(\\(?:\\sw\\|\\s_\\)+\\)?"
+    (1 font-lock-keyword-face nil t)
+    (2 font-lock-function-name-face nil t)))))
+
+(add-hook 'emacs-lisp-mode-hook #'generate--activate-font-lock-keywords)
+
 (defun generate--get-ert-outcome-attribute (constant attribute)
   "Returns a closure that returns the value of ATTRIBUTE from CONSTANT for OUTCOME."
   (lambda (outcome)
@@ -2303,6 +2313,19 @@ the ert-test object."
 
 (defalias 'generate--nth-mod-file-extensions (-rpartial #'generate-nth-mod generate--FILE-EXTENSIONS))
 
+(defalias 'generate-random-punctuation (apply-partially #'generate-seq-take-random-value-from-seq generate--PUNCTUATION) "Returns a random member of generate-PUNCTUATION.")
+
+(defalias 'generate-random-color (-compose (-applify #'color-rgb-to-hex) (apply-partially #'generate-list-of-floats-between-0-and-1 :exact-length 3)))
+
+(defun generate-list-of-n-colors (n)
+  "Returns a list of N colors.
+Values are hexadecimals."
+  (let* ((float-count (* n 3))
+	 (floats (generate-list-of-floats-between-0-and-1 :exact-length float-count)))
+    (funcall (-compose (apply-partially #'mapcar (-applify #'color-rgb-to-hex)) #'-partition) 3 floats)))
+
+(defalias 'generate-random-list-of-colors (generate-default-convert-n-gen-to-random #'generate-list-of-n-colors))
+
 (defconst generate--NUMBER-GENS
   (vector
    #'generate-random-float-between-0-and-1
@@ -2437,25 +2460,11 @@ called a random amount of times."
 
 (defalias 'generate-random-color (-compose (-applify #'color-rgb-to-hex) (apply-partially #'generate-list-of-floats-between-0-and-1 :exact-length 3)))
 
-(defun generate-list-of-n-colors (n)
-  "Returns a list of N colors.
-Values are hexadecimals."
-  (let* ((float-count (* n 3))
-	 (floats (generate-list-of-floats-between-0-and-1 :exact-length float-count)))
-    (funcall (-compose (apply-partially #'mapcar (-applify #'color-rgb-to-hex)) #'-partition) 3 floats)))
+(defalias 'generate-random-list (apply-partially #'generate-call-random-function generate--LIST-GENS) "Returns a random list.")
 
 (defalias 'generate-random-list-of-colors (generate-default-convert-n-gen-to-random #'generate-list-of-n-colors))
 
-(defun generate--activate-font-lock-keywords ()
-"Activate font-lock keywords for some of ERT's symbols."
-(font-lock-add-keywords
- nil
- '(("(\\(\\<generate-ert-deftest-n-times\\)\\>\\s *\\(\\(?:\\sw\\|\\s_\\)+\\)?"
-    (1 font-lock-keyword-face nil t)
-    (2 font-lock-function-name-face nil t)))))
 
-(add-hook 'emacs-lisp-mode-hook #'generate--activate-font-lock-keywords)
-;;add hook for ob-src-blocks
 
 (provide 'generate)
 ;;; generate.el ends here

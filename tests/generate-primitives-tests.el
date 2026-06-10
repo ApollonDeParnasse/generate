@@ -43,6 +43,17 @@
 (defconst MAX-PRECISON
   10000000 "I can not gurantee results will be accurate for numbers larger than 1000000.")
 
+(defalias 'generate--seq-every-p-number (apply-partially #'seq-every-p #'numberp))
+(defalias 'generate--seq-every-p-string (apply-partially #'seq-every-p #'stringp))
+(defalias 'generate--seq-every-p-seq (apply-partially #'seq-every-p #'seqp))
+(defalias 'generate--seq-every-p-map (apply-partially #'seq-every-p #'mapp))
+(defalias 'generate--seq-every-p-list (apply-partially #'seq-every-p #'listp))
+(defalias 'generate--seq-every-p-vector (apply-partially #'seq-every-p #'vectorp))
+(defalias 'generate--seq-every-p-con (apply-partially #'seq-every-p #'-cons-pair-p))
+(defalias 'generate--seq-every-p-hash-table (apply-partially #'seq-every-p #'hash-table-p))
+(defalias 'generate--seq-every-p-plist (apply-partially #'seq-every-p #'plistp))
+(defalias 'generate--seq-every-p-alist (apply-partially #'seq-every-p #'generate--alistp))
+
 (generate-ert-deftest-n-times generate--times ()
   :num-runs 100
   (-let* ((((expected-num test-func) test-calls) (funcall (-juxt (-compose (-juxt #'identity #'cl-constantly) #'generate--random-nat-number-in-range-255) #'generate--random-nat-number-in-range-255)))
