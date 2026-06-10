@@ -100,7 +100,7 @@
 
 (defun generate--create-fresh-ert-stats-for-tests-groups-alist (tests-groups-alist)
   (let ((tests (generate--create-vector-of-tests-for-fake-tests-groups-alist tests-groups-alist)))
-    (ert--make-stats tests 't)))
+    (ert--make-stats tests t)))
 
 (defun generate--fake-fresh-tests-groups-alist-and-stats ()
   (-let* (((tests-groups-alist total-relative-tests-count total-absolute-tests-count group-names) (generate--fake-fresh-tests-groups-alist))
@@ -194,9 +194,9 @@
 								  absolute-total-tests-count)))
       (list full-tests-groups-alist ert-test-stats next-ert-test next-ert-test-result currently-executing-test-group-name next-test-index-for-group completed-tests-count-for-group total-tests-count-for-group absolute-outcomes-counts-plist))))
 
-(defalias 'generate--fake-mid-run-data-for-group-with-one-more-test-left (generate--fake-mid-run-data-for-x-type 't))
+(defalias 'generate--fake-mid-run-data-for-group-with-one-more-test-left (generate--fake-mid-run-data-for-x-type t))
 
-(defalias 'generate--fake-mid-run-data-for-group-with-more-than-one-test-left (generate--fake-mid-run-data-for-x-type 'nil))
+(defalias 'generate--fake-mid-run-data-for-group-with-more-than-one-test-left (generate--fake-mid-run-data-for-x-type nil))
 
 (defun generate--fake-completed-test-group-con-for-outcome-x (base-outcomes-counts-plist)
   (-lambda ((group-name requested-outcome expected-result-type
@@ -608,7 +608,7 @@
   (-let* ((test-outcome (generate--random-ert-test-outcome))
 	  (((_ . actual-group-stats) actual-ert-test-name actual-next-test-index-for-group actual-completed-tests-count-for-group
 			   actual-total-tests-count-for-group actual-absolute-outcomes-counts-plist)
-	   (generate--fake-mid-run-tests-groups-con-for-x-type test-outcome 'nil))
+	   (generate--fake-mid-run-tests-groups-con-for-x-type test-outcome nil))
 	  ((&plist
 	    :total-tests
 	    :completed-tests
@@ -631,7 +631,7 @@
   (-let* ((test-outcome (generate--random-ert-test-outcome))
 	  (((_ . actual-group-stats) actual-ert-test-name actual-next-test-index-for-group actual-completed-tests-count-for-group
 			   actual-total-tests-count-for-group actual-absolute-outcomes-counts-plist)
-	   (generate--fake-mid-run-tests-groups-con-for-x-type test-outcome 't))
+	   (generate--fake-mid-run-tests-groups-con-for-x-type test-outcome t))
 	  ((&plist
 	    :total-tests
 	    :completed-tests
@@ -661,7 +661,7 @@
 	    actual-total-tests-count-for-group
 	    actual-absolute-total-tests-count
 	    actual-absolute-outcomes-counts-plist)
-	   (generate--fake-mid-run-tests-groups-alist-for-x-type test-outcome 'nil))
+	   (generate--fake-mid-run-tests-groups-alist-for-x-type test-outcome nil))
 	  (actual-group-stats (map-elt actual-tests-groups-alist actual-ert-test-name))
 	  ((&plist
 	    :total-tests
@@ -694,7 +694,7 @@
 	    actual-total-tests-count-for-group
 	    actual-absolute-total-tests-count
 	    actual-absolute-outcomes-counts-plist)
-	   (generate--fake-mid-run-tests-groups-alist-for-x-type test-outcome 't))
+	   (generate--fake-mid-run-tests-groups-alist-for-x-type test-outcome t))
 	  (actual-group-stats (map-elt actual-tests-groups-alist actual-ert-test-name))
 	  ((&plist
 	    :total-tests
@@ -727,7 +727,7 @@
 	    expected-total-tests-count-for-group
 	    expected-absolute-total-tests-count
 	    absolute-outcomes-counts-plist)
-	   (generate--fake-mid-run-tests-groups-alist-for-x-type test-outcome 'nil))
+	   (generate--fake-mid-run-tests-groups-alist-for-x-type test-outcome nil))
 	  ((actual-ert-stats actual-ert-test) (generate--fake-mid-run-ert-stats-for-tests-groups-alist
 			     full-tests-groups-alist
 			     test-currently-executing-test-group
@@ -745,7 +745,7 @@
 		 (actual-end-time end-time))
 	actual-ert-stats
       ;; selector
-      (should (equal actual-selector 't))
+      (should (equal actual-selector t))
       ;; tests
       (should (vectorp actual-tests))
       (should (length= actual-tests expected-absolute-total-tests-count))
@@ -785,7 +785,7 @@
 	    expected-total-tests-count-for-group
 	    expected-absolute-total-tests-count
 	    absolute-outcomes-counts-plist)
-	   (generate--fake-mid-run-tests-groups-alist-for-x-type test-outcome 't))
+	   (generate--fake-mid-run-tests-groups-alist-for-x-type test-outcome t))
 	  ((actual-ert-stats actual-ert-test) (generate--fake-mid-run-ert-stats-for-tests-groups-alist
 			     full-tests-groups-alist
 			     test-currently-executing-test-group
@@ -803,7 +803,7 @@
 		 (actual-end-time end-time))
 	actual-ert-stats
       ;; selector
-      (should (equal actual-selector 't))
+      (should (equal actual-selector t))
       ;; tests
       (should (vectorp actual-tests))
       (should (length= actual-tests expected-absolute-total-tests-count))
@@ -1010,7 +1010,7 @@
 	   (generate--fake-completed-tests-groups-alist test-outcome))
 	  (actual-ert-stats (generate--create-completed-ert-stats-for-tests-groups-alist test-absolute-total-tests-count tests-groups-alist)))
     ;; selector
-    (should (equal (ert--stats-selector actual-ert-stats) 't))
+    (should (equal (ert--stats-selector actual-ert-stats) t))
     ;; tests
     (should (vectorp (ert--stats-tests actual-ert-stats)))
     (should (ert-test-p (generate-seq-take-random-value-from-seq (ert--stats-tests actual-ert-stats))))
@@ -1298,7 +1298,7 @@
       (-let* ((test-outcome (generate--random-ert-test-outcome))
 	      ((tests-groups-alist ert-test-stats expected-tests-count outcomes-counts-plist group-names)
 	       (generate--fake-completed-tests-groups-alist-and-stats test-outcome))
-	      (abortedp 't)
+	      (abortedp t)
 	      (test-event-args (list ert-test-stats abortedp))
 	      (actual-message (progn (generate--run-tests-batch-handle-run-ended tests-groups-alist test-event-args) (apply #'concat (reverse messages)))))
 	(should (s-contains-p "Aborted" actual-message))

@@ -57,15 +57,15 @@
 
 (defconst generate--DEFAULT-OUTCOMES-PLIST
   (list :passed-expected
-	(list :exclusive 't :expectedp 't :expected-result-type ':passed :summary-message (cl-constantly "passed as expected") :breakdown-message "Passed as expected" :slot #'ert--stats-passed-expected :compatible ':failed-unexpected :test-outcome-sign "✓")
+	(list :exclusive t :expectedp t :expected-result-type ':passed :summary-message (cl-constantly "passed as expected") :breakdown-message "Passed as expected" :slot #'ert--stats-passed-expected :compatible ':failed-unexpected :test-outcome-sign "✓")
 	:passed-unexpected
-	(list :exclusive 'nil :expectedp 'nil :expected-result-type ':failed :summary-message (cl-constantly "passed unexpectedly") :breakdown-message "Passed unexpectedly" :slot #'ert--stats-passed-unexpected :compatible ':failed-expected :test-outcome-sign "×")
+	(list :exclusive nil :expectedp nil :expected-result-type ':failed :summary-message (cl-constantly "passed unexpectedly") :breakdown-message "Passed unexpectedly" :slot #'ert--stats-passed-unexpected :compatible ':failed-expected :test-outcome-sign "×")
 	:skipped
-	(list :exclusive 't :expectedp 't :expected-result-type ':skipped :summary-message (lambda (count) (if (> count 1) "were skipped" "was skipped")) :breakdown-message "Skipped" :slot #'ert--stats-skipped :compatible ':skipped :test-outcome-sign "↓")
+	(list :exclusive t :expectedp t :expected-result-type ':skipped :summary-message (lambda (count) (if (> count 1) "were skipped" "was skipped")) :breakdown-message "Skipped" :slot #'ert--stats-skipped :compatible ':skipped :test-outcome-sign "↓")
 	:failed-expected
-	(list :exclusive 't :expectedp 't :expected-result-type ':failed :summary-message (cl-constantly "failed as expected") :breakdown-message "Failed as expected" :slot #'ert--stats-failed-expected :compatible ':passed-unexpected :test-outcome-sign "✓")
+	(list :exclusive t :expectedp t :expected-result-type ':failed :summary-message (cl-constantly "failed as expected") :breakdown-message "Failed as expected" :slot #'ert--stats-failed-expected :compatible ':passed-unexpected :test-outcome-sign "✓")
 	:failed-unexpected
-	(list :exclusive 'nil :expectedp 'nil :expected-result-type ':passed :summary-message (cl-constantly "failed unexpectedly") :breakdown-message "Failed unexpectedly" :slot #'ert--stats-failed-unexpected :compatible ':passed-expected :test-outcome-sign "×")))
+	(list :exclusive nil :expectedp nil :expected-result-type ':passed :summary-message (cl-constantly "failed unexpectedly") :breakdown-message "Failed unexpectedly" :slot #'ert--stats-failed-unexpected :compatible ':passed-expected :test-outcome-sign "×")))
 
 (defconst generate--TEST-GROUPS-PLIST
   (list
@@ -302,7 +302,7 @@ KEYS-AND-BODY and adds them to COLLECTION."
   (declare (pure t) (side-effect-free t))
   (-let (((documentation keys-and-body) (if (stringp (car docstring-keys-and-body))
 					    (list (list :documentation (car docstring-keys-and-body)) (cdr docstring-keys-and-body))
-					  (list (list :documentation 'nil) docstring-keys-and-body))))
+					  (list (list :documentation nil) docstring-keys-and-body))))
     (generate--collect-keywords keys-and-body documentation)))
 
 ;;;###autoload
@@ -419,7 +419,7 @@ and the exclusivity requirement was met."
   (thunk-let* ((outcome-value (generate--plist-get outcome test-group-plist))
 	       (other-outcomes (-remove (apply-partially #'equal outcome) list-of-outcomes))
 	       (other-outcome-values (mapcar (lambda (other-outcome) (generate--plist-get other-outcome test-group-plist)) other-outcomes))
-	       (exclusive-check (if exclusivep (seq-every-p (apply-partially #'equal 0) other-outcome-values) 't)))
+	       (exclusive-check (if exclusivep (seq-every-p (apply-partially #'equal 0) other-outcome-values) t)))
     (and (g--gt0 outcome-value) exclusive-check)))
 
 
@@ -440,23 +440,23 @@ if every single one of its results matches OUTCOME.
 
 \(fn ERT-OUTCOME EXCLUSIVEP TESTS-GROUPS-ALIST)")
 
-(defalias 'generate--stats-passed-expected (apply-partially #'generate--stats :passed-expected 't) "Returns a con cell with the count of test-groups that passed as expected.
+(defalias 'generate--stats-passed-expected (apply-partially #'generate--stats :passed-expected t) "Returns a con cell with the count of test-groups that passed as expected.
 
 \(fn TESTS-GROUPS-ALIST)")
 
-(defalias 'generate--stats-failed-expected (apply-partially #'generate--stats :failed-expected 't) "Returns a con cell with the count of test-groups that failed as expected.
+(defalias 'generate--stats-failed-expected (apply-partially #'generate--stats :failed-expected t) "Returns a con cell with the count of test-groups that failed as expected.
 
 \(fn TESTS-GROUPS-ALIST)")
 
-(defalias 'generate--stats-skipped (apply-partially #'generate--stats :skipped 't) "Returns a con cell with the count of test-groups that were skipped.
+(defalias 'generate--stats-skipped (apply-partially #'generate--stats :skipped t) "Returns a con cell with the count of test-groups that were skipped.
 
 \(fn TESTS-GROUPS-ALIST)")
 
-(defalias 'generate--stats-failed-unexpected (apply-partially #'generate--stats :failed-unexpected 'nil) "Returns a con cell with the count of test-groups that failed unexpectedly.
+(defalias 'generate--stats-failed-unexpected (apply-partially #'generate--stats :failed-unexpected nil) "Returns a con cell with the count of test-groups that failed unexpectedly.
 
 \(fn TESTS-GROUPS-ALIST)")
 
-(defalias 'generate--stats-passed-unexpected (apply-partially #'generate--stats :passed-unexpected 'nil) "Returns a con cell with the count of test-groups that passed unexpectedly.
+(defalias 'generate--stats-passed-unexpected (apply-partially #'generate--stats :passed-unexpected nil) "Returns a con cell with the count of test-groups that passed unexpectedly.
 
 \(fn TESTS-GROUPS-ALIST)")
 
@@ -751,7 +751,7 @@ and less than or equal to the given number?
   "Is VAL a timestamp."
   (when val
     (let ((current-time-list nil))
-      (ignore-errors (when (decode-time val) 't)))))
+      (ignore-errors (when (decode-time val) t)))))
 
 (defun generate-nth-mod (n list &optional delta)
   "Return the N + DELTA element of LIST.
@@ -979,6 +979,7 @@ Also returns the list of numbers used to create those predicates.")
 (defalias 'generate--seq-map-char-to-string (apply-partially #'seq-map #'char-to-string))
 (defalias 'generate--seq-map-cl-constantly (apply-partially #'seq-map #'cl-constantly))
 (defalias 'generate--seq-map-vector (apply-partially #'seq-map #'vector))
+(defalias 'generate--seq-map-applify-vector (apply-partially #'seq-map (-applify #'vector)))
 
 (defalias 'generate--seq-max-plus-one (-compose #'1+ #'seq-max))
 (defalias 'generate--seq-max-plus-1-and-random-chunk-length (-juxt #'generate--seq-max-plus-one  #'generate--seq-random-chunk-length))
@@ -986,15 +987,7 @@ Also returns the list of numbers used to create those predicates.")
 (defalias 'generate--seq-every-p-nat-number (apply-partially #'seq-every-p #'natnump))
 (defalias 'generate--seq-every-p-float (apply-partially #'seq-every-p #'floatp))
 (defalias 'generate--seq-every-p-between-0-and-1 (apply-partially #'seq-every-p #'generate--between-0-and-1-exclusive-p))
-
 (defalias 'generate--seq-every-p-between-0-and-1-inclusive (apply-partially #'seq-every-p #'generate--between-0-and-1-inclusive-p))
-
-(defalias 'generate--seq-every-p-string (apply-partially #'seq-every-p #'stringp))
-(defalias 'generate--seq-every-p-seq (apply-partially #'seq-every-p #'seqp))
-(defalias 'generate--seq-every-p-map (apply-partially #'seq-every-p #'mapp))
-(defalias 'generate--seq-every-p-list (apply-partially #'seq-every-p #'listp))
-(defalias 'generate--seq-every-p-vector (apply-partially #'seq-every-p #'vectorp))
-(defalias 'generate--seq-every-p-con (apply-partially #'seq-every-p #'-cons-pair-p))
 
 (defalias 'generate--seq-take-one (-rpartial #'seq-take 1))
 (defalias 'generate--seq-take-two (-rpartial #'seq-take 2))
@@ -1012,13 +1005,13 @@ Also returns the list of numbers used to create those predicates.")
   "Get all but the last value of SEQ."
   (if (> (seq-length seq) 1)
       (funcall (-compose (apply-partially #'seq-subseq seq 0) #'1- #'seq-length) seq)
-    'nil))
+    nil))
 
 (defun generate--seq-cdr (seq)
   "Get the cdr of SEQ."
   (if (> (seq-length seq) 1)
       (funcall (-compose (apply-partially #'seq-subseq seq 1) #'seq-length) seq)
-    'nil))
+    nil))
 
 (cl-defgeneric generate--seq-reduce-right-indexed (function sequence initial-value)
   "Reduce the function FUNCTION across SEQUENCE, from right to left.
@@ -1508,8 +1501,6 @@ or simply :EXACT-LENGTH.
 
 (defalias 'generate-random-vector-of-lists-nat-numbers (apply-partially #'generate-data :list-transformer (-compose #'generate--applify-vector #'generate-seq-split-random)) "Returns a random vector of lists of natural numbers.")
 
-(defalias 'generate-random-vector-of-vectors-nat-numbers (-compose #'generate--seq-map-vector #'generate-random-vector-of-lists-nat-numbers) "Returns a random vector of vectors of natural numbers.")
-
 (defalias 'generate-random-alist-of-nat-numbers (apply-partially #'generate-data :list-transformer (-compose #'generate--applify-zip (-juxt #'seq-reverse #'generate-seq-shuffle))) "Returns a random alist.
 Both the keys and the values will be natural numbers.")
 
@@ -1579,7 +1570,7 @@ The cdr will b a vector.")
 
 (defalias 'generate-random-list-of-symbols (-compose (apply-partially #'mapcar #'make-symbol) #'generate-random-list-of-unique-strings) "Returns a random list of symbols.")
 
-(defalias 'generate-random-boolean (apply-partially #'generate-seq-take-random-value-from-seq (list 't 'nil))
+(defalias 'generate-random-boolean (apply-partially #'generate-seq-take-random-value-from-seq (list t nil))
   "Returns a random boolean.")
 
 (defun generate-list-of-n-booleans (n)
@@ -1957,7 +1948,7 @@ of the table."
   (declare (indent 1) (debug t))
   (generate--with-buffer-with-org-table-helper #'generate-org-table org-table-args body))
 
-(defun generate--org-timestamp-string (lisp-timestamp with-time inactive)  
+(defun generate--org-timestamp-string (lisp-timestamp with-time inactive)
   (format-time-string
    (org-time-stamp-format with-time inactive)
    lisp-timestamp))
@@ -1968,18 +1959,18 @@ of the table."
 
 \(fn WITH-TIME)" (if inactive "inactive" "active") type))
     (funcall
-     transformer     
+     transformer
      (generate-random-lisp-timestamp)
      with-time
      inactive)))
 
-(defalias 'generate-inactive-org-timestamp-string (generate--org-timestamp 't))
+(defalias 'generate-inactive-org-timestamp-string (generate--org-timestamp t))
 
 (defalias 'generate-random-inactive-org-timestamp-string (-compose #'generate-inactive-org-timestamp-string #'generate-random-boolean) "Returns an inactive org timestamp.
 The timestamp may or may not have
 a start time.")
 
-(defalias 'generate-active-org-timestamp-string (generate--org-timestamp 'nil))
+(defalias 'generate-active-org-timestamp-string (generate--org-timestamp nil))
 
 (defalias 'generate-random-active-org-timestamp-string  (-compose #'generate-active-org-timestamp-string #'generate-random-boolean) "Returns an active org timestamp.
 The timestamp may or may not have
@@ -1996,9 +1987,9 @@ The timestamp may or may not be inactive.
 The timestamp may or may not have a
 start time.")
 
-(defalias 'generate-random-inactive-org-timestamp-element (generate--org-timestamp 't #'org-timestamp-from-time "element"))
+(defalias 'generate-random-inactive-org-timestamp-element (generate--org-timestamp t #'org-timestamp-from-time "element"))
 
-(defalias 'generate-random-active-org-timestamp-element (generate--org-timestamp 'nil #'org-timestamp-from-time "element"))
+(defalias 'generate-random-active-org-timestamp-element (generate--org-timestamp nil #'org-timestamp-from-time "element"))
 
 (defun generate-org-timestamp-element (with-time)
   "Returns a random org timestamp element.
@@ -2090,13 +2081,13 @@ SYMBOL should be void-function or void-variable."
 
 (defalias 'generate--random-x-type-ert-test-outcome (generate--random-x-type-ert-test-outcome-base generate--DEFAULT-OUTCOMES-PLIST))
 
-(defalias 'generate--random-exclusive-ert-test-outcome (generate--random-x-type-ert-test-outcome :exclusive 't))
+(defalias 'generate--random-exclusive-ert-test-outcome (generate--random-x-type-ert-test-outcome :exclusive t))
 
-(defalias 'generate--random-non-exclusive-ert-test-outcome (generate--random-x-type-ert-test-outcome :exclusive 'nil))
+(defalias 'generate--random-non-exclusive-ert-test-outcome (generate--random-x-type-ert-test-outcome :exclusive nil))
 
-(defalias 'generate--random-expected-ert-test-outcome (generate--random-x-type-ert-test-outcome :expectedp 't))
+(defalias 'generate--random-expected-ert-test-outcome (generate--random-x-type-ert-test-outcome :expectedp t))
 
-(defalias 'generate--random-unexpected-ert-test-outcome (generate--random-x-type-ert-test-outcome :expectedp 'nil))
+(defalias 'generate--random-unexpected-ert-test-outcome (generate--random-x-type-ert-test-outcome :expectedp nil))
 
 (defun generate--make-should-form-gen-for-type-x (pcase-randomizer)
   (lambda (passing assert-symbol random-val)
@@ -2169,10 +2160,10 @@ SYMBOL should be void-function or void-variable."
 (defalias 'generate-passing-should-not-form (generate--should-form-for-type-x :passing t :assert-symbol 'should-not)
   "Returns a random passing should-not form.")
 
-(defalias 'generate-failing-should-form (generate--should-form-for-type-x :passing 'nil :assert-symbol 'should)
+(defalias 'generate-failing-should-form (generate--should-form-for-type-x :passing nil :assert-symbol 'should)
   "Returns a random failing should form.")
 
-(defalias 'generate-failing-should-not-form (generate--should-form-for-type-x :passing 'nil :assert-symbol 'should-not)
+(defalias 'generate-failing-should-not-form (generate--should-form-for-type-x :passing nil :assert-symbol 'should-not)
   "Returns a random failing should-not form.")
 
 (defalias 'generate-random-passing-should (apply-partially #'generate-call-random-function (list #'generate-passing-should-form
@@ -2201,8 +2192,8 @@ The form itself may be a passing form or a failing form.")
   (let* ((vals (generate-list-of-n-random-values n))
 	 (should-count (generate--random-nat-number-between-0-and n))
 	 (should-not-count (- n should-count))
-	 (shoulds (generate-seq-take-infinite should-count (list (list 't 'should))))
-	 (should-nots (generate-seq-take-infinite should-not-count (list (list 't 'should-not))))
+	 (shoulds (generate-seq-take-infinite should-count (list (list t 'should))))
+	 (should-nots (generate-seq-take-infinite should-not-count (list (list t 'should-not))))
 	 (all-should-args (generate-append-and-shuffle shoulds should-nots)))
     (-zip-with #'generate--list-of-n-passing-should-forms-helper vals all-should-args)))
 
@@ -2239,7 +2230,7 @@ FAILED-SHOULD should be a valid `should', e.g., (should (equal x y)).
 (defun generate--ert-test-skipped-condition (skipped-should)
   "Returns a valid `ert-test-skipped' condition.
 SKIPPED-SHOULD should be a valid `should', e.g., (should (equal x y))."
-  (list 'ert-test-skipped (list skipped-should :form (cadr skipped-should) :value 't)))
+  (list 'ert-test-skipped (list skipped-should :form (cadr skipped-should) :value t)))
 
 (cl-defun generate-ert-test-result-object (outcome duration)
   "Returns an ert-test-result object.
@@ -2313,20 +2304,28 @@ the ert-test object."
 (defalias 'generate--nth-mod-file-extensions (-rpartial #'generate-nth-mod generate--FILE-EXTENSIONS))
 
 (defconst generate--NUMBER-GENS
-  (vector #'generate-random-float-between-0-and-1 #'generate-random-nat-number #'generate-random-negative-number))
+  (vector
+   #'generate-random-float-between-0-and-1
+   #'generate-random-nat-number
+   #'generate-random-negative-number))
+
+(defconst generate--STRING-GENS
+  (vector
+   #'generate-random-word
+   #'generate-random-multiline-string))
 
 (defconst generate--LIST-GENS
   (vector #'generate-list-of-nat-numbers
-      #'generate-list-of-floats-between-0-and-1
-      #'generate-list-of-floats
-      #'generate-random-list-of-strings
-      #'generate-random-list-of-lists-nat-numbers))
+	  #'generate-list-of-floats-between-0-and-1
+	  #'generate-list-of-floats
+	  #'generate-random-list-of-strings
+	  #'generate-random-list-of-lists-nat-numbers))
 
 (defconst generate--HASH-TABLE-GENS
   (vector #'generate-random-hash-table-of-nat-numbers
-    #'generate-random-hash-table-of-strings
-    #'generate-random-hash-table-of-string-nat-number-pairs
-    #'generate-random-hash-table-of-nat-number-string-pairs))
+	  #'generate-random-hash-table-of-strings
+	  #'generate-random-hash-table-of-string-nat-number-pairs
+	  #'generate-random-hash-table-of-nat-number-string-pairs))
 
 (defconst generate--VECTOR-GENS
   (vector
@@ -2334,24 +2333,19 @@ the ert-test object."
    #'generate-vector-of-floats
    #'generate-vector-of-floats-between-0-and-1
    #'generate-random-vector-of-strings
-   #'generate-random-vector-of-vectors-nat-numbers
    #'generate-random-vector-of-lists-nat-numbers))
 
 (defconst generate--ALIST-GENS
   (vector #'generate-random-alist-of-nat-numbers
-    #'generate-random-alist-of-strings
-    #'generate-random-alist-of-string-nat-number-cons
-    #'generate-random-alist-of-nat-number-string-cons))
+	  #'generate-random-alist-of-strings
+	  #'generate-random-alist-of-string-nat-number-cons
+	  #'generate-random-alist-of-nat-number-string-cons))
 
 (defconst generate--PLIST-GENS
-    (vector #'generate-random-plist-of-nat-numbers
-      #'generate-random-plist-of-strings
-      #'generate-random-plist-of-string-nat-number-pairs
-      #'generate-random-plist-of-nat-number-string-pairs))
-
-
-(defconst generate--STRING-GENS
-  (vector #'generate-random-word #'generate-random-multiline-string))
+  (vector #'generate-random-plist-of-nat-numbers
+	  #'generate-random-plist-of-strings
+	  #'generate-random-plist-of-string-nat-number-pairs
+	  #'generate-random-plist-of-nat-number-string-pairs))
 
 (defconst generate--SEQ-GENS
   (vconcat generate--LIST-GENS generate--VECTOR-GENS generate--STRING-GENS))
