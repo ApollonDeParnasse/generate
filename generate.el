@@ -588,8 +588,8 @@ This was lifted directly from
   (pcase-exhaustive (list expected-result matches-expected-result)
     (`(:passed t) :passed-expected)
     (`(:failed t) :failed-expected)
-    (`(:passed nil) :passed-unexpected)
-    (`(:failed nil) :failed-expected)
+    (`(:passed nil) :failed-unexpected)
+    (`(:failed nil) :passed-unexpected)
     (`(:skipped ,_) :skipped)))
 
 (defun generate--run-tests-batch-handle-run-started (selector tests-groups-alist event-args)
