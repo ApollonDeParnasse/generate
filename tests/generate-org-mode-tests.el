@@ -159,7 +159,7 @@
 (generate-ert-deftest-n-times generate-org-timestamp-string-with-time ()
   :num-runs 100
   (let* ((actual-timestamp (generate-org-timestamp-string t))
-	(actual-element (org-timestamp-from-string actual-timestamp)))
+	 (actual-element (org-timestamp-from-string actual-timestamp)))
     (should (org-element-property :hour-start actual-element))
     (should (org-element-property :minute-start actual-element))
     (should (string-match-p org-element--timestamp-regexp actual-timestamp))))
@@ -167,7 +167,7 @@
 (generate-ert-deftest-n-times generate-org-timestamp-string-without-time ()
   :num-runs 100
   (let* ((actual-timestamp (generate-org-timestamp-string nil))
-	(actual-element (org-timestamp-from-string actual-timestamp)))
+	 (actual-element (org-timestamp-from-string actual-timestamp)))
     (should-not (org-element-property :hour-start actual-element))
     (should-not (org-element-property :minute-start actual-element))
     (should (string-match-p org-element--timestamp-regexp actual-timestamp))))
@@ -268,7 +268,7 @@
 (generate-ert-deftest-n-times generate-random-list-of-org-timestamp-strings ()
   :num-runs 100
   (let* ((actual-list-of-timestamps (generate-random-list-of-org-timestamp-strings))
-	(actual-random-timestamp (generate-seq-take-random-value-from-seq actual-list-of-timestamps)))
+	 (actual-random-timestamp (generate-seq-take-random-value-from-seq actual-list-of-timestamps)))
     (should (string-match-p org-element--timestamp-regexp actual-random-timestamp))
     (should (proper-list-p actual-list-of-timestamps))))
 
@@ -384,7 +384,7 @@
 
 (generate-ert-deftest-n-times generate-list-of-org-timestamp-elements/with-time ()
   :num-runs 100
-  (let* ((test-count (generate--random-nat-number-in-range-10))	 
+  (let* ((test-count (generate--random-nat-number-in-range-10))
 	 (actual-elements (generate-list-of-n-org-timestamp-elements t test-count))
 	 (actual-element (generate-seq-take-random-value-from-seq actual-elements)))
     (should (length= actual-elements test-count))

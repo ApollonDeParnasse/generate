@@ -26,7 +26,7 @@
 
 ;;; Commentary:
 
-;; 
+;;
 
 ;;; Code:
 
@@ -112,20 +112,20 @@
 (generate-ert-deftest-n-times generate--ert-test-failed-error ()
   :num-runs 100
   (-let* ((test-should (generate-random-failing-should))
-	 ((actual-error actual-val) (generate--ert-test-failed-error test-should)))
+	  ((actual-error actual-val) (generate--ert-test-failed-error test-should)))
     (should (equal actual-error 'ert-test-failed))
     (should (symbolp (caar actual-val)))))
 
 (generate-ert-deftest-n-times generate--ert-test-failed-condition ()
   :num-runs 100
   (-let* ((test-should (generate-random-failing-should))
-	 ((actual-error _) (generate--ert-test-failed-condition test-should)))
+	  ((actual-error _) (generate--ert-test-failed-condition test-should)))
     (should (symbolp actual-error))))
 
 (generate-ert-deftest-n-times generate--ert-test-skipped-condition ()
   :num-runs 100
   (-let* ((test-should (generate-random-failing-should))
-	 ((actual-condition-symbol actual-val) (generate--ert-test-skipped-condition test-should)))
+	  ((actual-condition-symbol actual-val) (generate--ert-test-skipped-condition test-should)))
     (should (equal actual-condition-symbol 'ert-test-skipped))
     (should (symbolp (caar actual-val)))))
 
@@ -144,8 +144,8 @@
   (-let* ((test-duration (generate-random-nat-number))
 	  (test-outcome (generate-seq-take-random-value-from-seq (list :failed-unexpected :failed-expected :skipped)))
 	  ((expected-condition-symbol expected-result-type) (generate--plist-get test-outcome (list :failed-unexpected (list 'ert-test-failed :failed)
-								:failed-expected (list 'ert-test-failed :failed)
-								:skipped (list 'ert-test-skipped :skipped))))
+												    :failed-expected (list 'ert-test-failed :failed)
+												    :skipped (list 'ert-test-skipped :skipped))))
 	  (actual-ert-test-result (generate-ert-test-result-object test-outcome test-duration)))
     (should (ert-test-result-type-p actual-ert-test-result expected-result-type))
     (should (stringp (ert-test-result-with-condition-messages actual-ert-test-result)))

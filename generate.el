@@ -169,7 +169,7 @@
   "Use ARGS to create a plural verson of MACRO."
   `(progn
      ,@(seq-map (lambda (p) `(,macro ,p))
-	     (symbol-value args))))
+		(symbol-value args))))
 
 (defun generate--plist-get (prop plist)
   "Extract value of PROP from PLIST.
@@ -345,12 +345,12 @@ If NUM-RUNS is not specified, your test will be defined 100 times.
 			  :file-name ,(or (macroexp-file-name) buffer-file-name))))))))
 
 (defun generate--activate-font-lock-keywords ()
-"Activate font-lock keywords for some of ERT's symbols."
-(font-lock-add-keywords
- nil
- '(("(\\(\\<generate-ert-deftest-n-times\\)\\>\\s *\\(\\(?:\\sw\\|\\s_\\)+\\)?"
-    (1 font-lock-keyword-face nil t)
-    (2 font-lock-function-name-face nil t)))))
+  "Activate font-lock keywords for some of ERT's symbols."
+  (font-lock-add-keywords
+   nil
+   '(("(\\(\\<generate-ert-deftest-n-times\\)\\>\\s *\\(\\(?:\\sw\\|\\s_\\)+\\)?"
+      (1 font-lock-keyword-face nil t)
+      (2 font-lock-function-name-face nil t)))))
 
 (add-hook 'emacs-lisp-mode-hook #'generate--activate-font-lock-keywords)
 
@@ -471,10 +471,10 @@ if every single one of its results matches OUTCOME.
 \(fn TESTS-GROUPS-ALIST)")
 
 (defalias 'generate--create-final-test-stats (-juxt #'generate--stats-passed-expected
-						     #'generate--stats-failed-expected
-						     #'generate--stats-skipped
-						     #'generate--stats-failed-unexpected
-						     #'generate--stats-passed-unexpected)
+						    #'generate--stats-failed-expected
+						    #'generate--stats-skipped
+						    #'generate--stats-failed-unexpected
+						    #'generate--stats-passed-unexpected)
   "Returns an with the test stats of a test run.
 
 \(fn TESTS-GROUPS-ALIST)")
@@ -495,9 +495,9 @@ if every single one of its results matches OUTCOME.
   (lambda (test-group-stats test-name)
     (-let* ((alist (list (cons test-name test-group-stats)))
 	    (zipped-outcomes (generate--create-final-test-stats alist))
-	   ((&plist :total-tests :duration) test-group-stats)
-	   ((test-outcome . _) (car (map-filter (lambda (_ val) (not (zerop val))) zipped-outcomes)))
-	   (expectedp (generate--plist-get :expectedp (generate--plist-get test-outcome default-outcomes-plist))))
+	    ((&plist :total-tests :duration) test-group-stats)
+	    ((test-outcome . _) (car (map-filter (lambda (_ val) (not (zerop val))) zipped-outcomes)))
+	    (expectedp (generate--plist-get :expectedp (generate--plist-get test-outcome default-outcomes-plist))))
       (if expectedp
 	  (generate--print-expected-outcome-message-for-test-group default-outcomes-plist test-outcome test-name total-tests total-tests duration)
 	(generate--print-unexpected-outcome-message-for-test-group default-outcomes-plist test-outcome test-group-stats test-name total-tests duration)))))
@@ -612,14 +612,14 @@ This was lifted directly from
 (cl-defun generate--run-tests-batch-handle-test-ended (tests-groups-alist (stats test result))
   (generate--print-messages-for-unexpected-outcomes test result)
   (-let* ((test-name (ert-test-name test))
-	 ((test-group-name) (generate--get-group-name-and-index-for-test test))
-	 (test-absolute-index (map-elt (ert--stats-test-map stats) test-name))
-	 (test-start-time (seq-elt (ert--stats-test-start-times stats) test-absolute-index))
-	 (test-end-time (seq-elt (ert--stats-test-end-times stats) test-absolute-index))
-	 (test-duration (ert-test-result-duration result))
-	 (expected-result (ert-test-expected-result-type test))
-	 (matches-expected-result (ert-test-result-expected-p test result))
-	 (test-result-key (generate--create-test-result-key expected-result matches-expected-result)))
+	  ((test-group-name) (generate--get-group-name-and-index-for-test test))
+	  (test-absolute-index (map-elt (ert--stats-test-map stats) test-name))
+	  (test-start-time (seq-elt (ert--stats-test-start-times stats) test-absolute-index))
+	  (test-end-time (seq-elt (ert--stats-test-end-times stats) test-absolute-index))
+	  (test-duration (ert-test-result-duration result))
+	  (expected-result (ert-test-expected-result-type test))
+	  (matches-expected-result (ert-test-result-expected-p test result))
+	  (test-result-key (generate--create-test-result-key expected-result matches-expected-result)))
     (cl-incf (generate--plist-get test-result-key (map-elt tests-groups-alist test-group-name)))
     (cl-incf (generate--plist-get :completed-tests (map-elt tests-groups-alist test-group-name)))
     (cl-incf (generate--plist-get :duration (map-elt tests-groups-alist test-group-name)) test-duration)
@@ -657,7 +657,7 @@ contains the test-groups that will be ran."
 
 ;;;###autoload
 (defun generate-run-tests-batch (&optional selector)
-    "Run the tests specified by SELECTOR, printing results to the terminal.
+  "Run the tests specified by SELECTOR, printing results to the terminal.
 
 SELECTOR selects which tests to run as described in `ert-select-tests' when
 called with its second argument t, except if SELECTOR is nil, in which case
@@ -674,7 +674,7 @@ This is generate's implementation of `ert-run-tests-batch'."
 
 ;;;###autoload
 (cl-defun generate-run-tests-batch-and-exit (&optional (selector t))
-    "Like `generate-run-tests-batch', but exits Emacs when done.
+  "Like `generate-run-tests-batch', but exits Emacs when done.
 
 The exit status will be 0 if all test results were as expected, 1
 on unexpected results, or 2 if the tool detected an error outside
@@ -709,8 +709,8 @@ Each argument may be a list, vector or string.
   (read (math-format-value calc-value)))
 
 (cl-defun generate--in-range-exclusive-p ((range-min range-max) number)
- "Is NUMBER greater than RANGE-MIN and less than or equal RANGE-MAX?"
- (and (>= number range-min) (< number range-max)))
+  "Is NUMBER greater than RANGE-MIN and less than or equal RANGE-MAX?"
+  (and (>= number range-min) (< number range-max)))
 
 (defalias 'generate--between-1-and-255-exclusive-p (apply-partially #'generate--in-range-exclusive-p (list 1 255)) "Is VALUE greater than or equal to 1 and less than 255?
 
@@ -779,12 +779,12 @@ INCREASE can also be larger than RANGE-MAX or even smaller than RANGE-MIN."
   (when (> range-min range-max)
     (user-error "Range-min %d is not less than range-max %d" range-min range-max))
   (let* ((range-size (- range-max range-min))
-       (adjusted-increase (% increase range-size))
-       (current-number-index (max (- current-number range-min) 0))
-       (adjusted-current-number-index (% current-number-index range-size))
-       (new-number-index (% (+ adjusted-current-number-index adjusted-increase) range-size))
-       (new-number (+ range-min new-number-index)))
-  new-number))
+	 (adjusted-increase (% increase range-size))
+	 (current-number-index (max (- current-number range-min) 0))
+	 (adjusted-current-number-index (% current-number-index range-size))
+	 (new-number-index (% (+ adjusted-current-number-index adjusted-increase) range-size))
+	 (new-number (+ range-min new-number-index)))
+    new-number))
 
 (defalias 'generate--get-next-lower-alpha-character (apply-partially #'generate--non-zero-bounded-modular-addition generate--LOWERALPHA 1) "Convert N into a lower alphabetic character.")
 (defalias 'generate--get-next-lower-alpha-string (-compose #'char-to-string #'generate--get-next-lower-alpha-character) "Convert N into a lower alphabetic string character.")
@@ -815,9 +815,9 @@ In other words, use an exclusive range: [MIN, MAX)"
 	       (distance-from-max (- max rand-one))
 	       (min-max (if (> distance-from-max distance-from-min) (list (1+ rand-one) max) (list min (1- rand-one))))
 	       (rand-two (generate-random-nat-number-in-range min-max)))
-  (if (eql min max)
-      (list min min)
-    (list rand-one rand-two))))
+    (if (eql min max)
+	(list min min)
+      (list rand-one rand-two))))
 
 (defalias 'generate-two-sorted-random-nat-numbers-in-range (-compose #'sort #'generate-two-random-nat-numbers-in-range)  "Returns two sorted random numbers.
 Each number will be that are greater than or equal to MIN less than MAX.
@@ -944,7 +944,7 @@ that will be generated."
 (defalias 'generate--non-default-convert-n-gen-to-random (generate--convert-n-gen-to-random-with-arg #'generate-random-nat-number))
 
 (defalias 'generate-default-convert-n-gen-to-random-with-arg (generate--convert-n-gen-to-random-with-arg #'generate--random-nat-number-in-range-1-to-25)
-    "Converts a GENERATOR-FUNCTION into a random generator.
+  "Converts a GENERATOR-FUNCTION into a random generator.
 GENERATOR-FUNCTION should only take two arguments.
 The first argument should correspond to the the number of values
 that will be generated. The second argument can be anything.")
@@ -954,7 +954,7 @@ that will be generated. The second argument can be anything.")
 
 \(fn INTEGER)"
   (funcall (-juxt #'identity (apply-partially #'+ size))
-	 (generate--random-nat-number)))
+	   (generate--random-nat-number)))
 
 (defalias 'generate-random-nat-number-range (generate-default-convert-n-gen-to-random #'generate-nat-number-range))
 
@@ -1040,12 +1040,12 @@ and FUNCTION is not called."
     (let ((acc initial-value)
 	  (len (seq-length sequence)))
       (seq-do-indexed
-        (lambda (elt index) (setq acc (funcall function elt acc (- len index 1))))
-      (reverse sequence))
+       (lambda (elt index) (setq acc (funcall function elt acc (- len index 1))))
+       (reverse sequence))
       acc)))
 
 (cl-defgeneric generate--seq-reduce-right (function sequence initial-value)
-    "Reduce the function FUNCTION across SEQUENCE, from right to left.
+  "Reduce the function FUNCTION across SEQUENCE, from right to left.
 
 Start with INITIAL-VALUE.  Return the result of calling FUNCTION
 with INITIAL-VALUE and the first element of SEQUENCE and the current index,
@@ -1079,7 +1079,7 @@ or equal to 1 and less than the length of SEQ."
 (defun generate-seq-random-chunk-of-size-n (chunk-length seq)
   "Returns a random chunk of size CHUNK-LENGTH from SEQ."
   (let* ((chunks (seq-split seq chunk-length))
-     (correct-chunks (seq-filter (-rpartial #'length= chunk-length) chunks)))
+	 (correct-chunks (seq-filter (-rpartial #'length= chunk-length) chunks)))
     (generate-seq-take-random-value-from-seq correct-chunks)))
 
 (defalias 'generate--applify-seq-random-chunk-of-size-n (-applify #'generate-seq-random-chunk-of-size-n) "Returns a random chunk of size CHUNK-LENGTH from SEQ.
@@ -1141,12 +1141,12 @@ When n is larger than the length of SEQ, we loop back around."
   (funcall (-compose (-rpartial #'seq-take n) #'-cycle) seq))
 
 (cl-defmethod generate-seq-take-infinite (n (seq vector))
-    "Take N values from SEQ.
+  "Take N values from SEQ.
 When n is larger than the length of SEQ, we loop back around."
   (funcall (-compose #'seq--into-vector (-rpartial #'seq-take n) #'-cycle) seq))
 
 (cl-defmethod generate-seq-take-infinite (n (seq string))
-      "Take N values from SEQ.
+  "Take N values from SEQ.
 When n is larger than the length of SEQ, we loop back around."
   (funcall (-compose #'seq--into-string (-rpartial #'seq-take n) #'-cycle) seq))
 
@@ -1160,7 +1160,7 @@ When n is larger than the length of SEQ, we loop back around."
 
 (cl-defmethod generate-seq-shuffle ((seq string))
   "Returns a shuffled SEQ (string)."
-   (funcall (-compose #'seq--into-string #'generate-shuffle-list #'seq--into-list) seq))
+  (funcall (-compose #'seq--into-string #'generate-shuffle-list #'seq--into-list) seq))
 
 (defun generate-seq-subseq-infinite (seq start end)
   "Return the elements of SEQ from START to END.
@@ -1170,20 +1170,20 @@ If START or END is negative, we counts from the end.
 If END is greater than the length of the list,
 we wrap back around."
   (cond
-    ((or (cl-minusp start) (cl-minusp end))
-	(error "Positions can not be negative"))
-    ((> start end)
-	(error "Start can not be greater than end"))
-    (t
-	(let* ((length (seq-length seq)))
-	 (if (> end length)
-	   (funcall (-compose (-rpartial #'seq-subseq start end) (-rpartial #'generate-seq-take-infinite seq) (apply-partially #'+ length) (apply-partially #'- end)) length)
-	   (seq-subseq seq start end))))))
+   ((or (cl-minusp start) (cl-minusp end))
+    (error "Positions can not be negative"))
+   ((> start end)
+    (error "Start can not be greater than end"))
+   (t
+    (let* ((length (seq-length seq)))
+      (if (> end length)
+	  (funcall (-compose (-rpartial #'seq-subseq start end) (-rpartial #'generate-seq-take-infinite seq) (apply-partially #'+ length) (apply-partially #'- end)) length)
+	(seq-subseq seq start end))))))
 
 (cl-defun generate--seq-n-random-subseqs-reducer (seq-to-slice (slices last-slice-end) curr-slice-size)
   (let* ((current-slice-end (+ last-slice-end curr-slice-size))
 	 (current-slice (generate-seq-subseq-infinite seq-to-slice last-slice-end current-slice-end)))
-	 (list (cons current-slice slices) current-slice-end)))
+    (list (cons current-slice slices) current-slice-end)))
 
 (defun generate-seq-n-random-infinite-subseqs (n seq)
   "Returns N random subseqs from SEQ.
@@ -1201,7 +1201,7 @@ than the length of SEQ."
     (seq-first (seq-reduce (apply-partially #'generate--seq-n-random-subseqs-reducer seq) slice-ends initial-value))))
 
 (defun generate-seq-split-infinite (length seq)
-    "Split SEQ into a list of sub-sequences.
+  "Split SEQ into a list of sub-sequences.
 LENGTH will be the length of each sub-sequence.
 If LENGTH is greater than the actual length
 of the list, we wrap back around."
@@ -1211,8 +1211,8 @@ of the list, we wrap back around."
     (generate--seq-reduce-right-indexed
      (lambda (_ acc index)
        (append (list (generate-seq-subseq-infinite seq (* index length) (* (1+ index) length))) acc))
-    seq-to-reduce
-    (list initial-value))))
+     seq-to-reduce
+     (list initial-value))))
 
 (defun generate-seq-n-random-chunks-of-size-x (length n seq)
   "Returns N random chunks from SEQ.
@@ -1254,7 +1254,7 @@ Each chunk will be LENGTH long."
   "Apply KEYS-FUNC to the MAP keys.
 Apply VALUES-FUNC to the MAP values.
 Finally, apply OP to MAP."
-   (funcall (-compose op (-juxt (-compose keys-func #'map-keys) (-compose values-func #'map-values))) map))
+  (funcall (-compose op (-juxt (-compose keys-func #'map-keys) (-compose values-func #'map-values))) map))
 
 (defun generate--map-merge-with-plus-plist (list-of-plists)
   (if (length= list-of-plists 1)
@@ -1288,13 +1288,13 @@ has transformed each item of the list."
 (defalias 'generate--seq-map-next-lower-alpha-character (apply-partially #'seq-map #'generate--get-next-lower-alpha-character) "Converts LIST into a list of lowercase alphabetic characters.")
 
 (cl-defun generate--n-words-reducer (string-of-characters (words last-end) current-end)
-      "Helper function used by `generate--n-words-helper'.
+  "Helper function used by `generate--n-words-helper'.
 Takes a subseq from STRING-OF-CHARACTERS.
 The subseq will start at LAST-END
 and end at CURRENT-END.  The subseq
 will be consed onto WORDS."
   (let* ((current-word-end (+ last-end current-end))
-       (current-word (seq-subseq string-of-characters last-end current-word-end)))
+	 (current-word (seq-subseq string-of-characters last-end current-word-end)))
     (list (cons current-word words) current-word-end)))
 
 (defun generate--list-of-n-words-helper (word-lengths string-of-characters)
@@ -1302,9 +1302,9 @@ will be consed onto WORDS."
 Chops STRING-OF-CHARACTERS into a list of words.
 The length of each word corresponds to a value in WORD-LENGTHS."
   (-let* (((first-word-length rest-of-list) (funcall (-juxt #'car #'cdr) word-lengths))
-      (first-word (list (seq-subseq string-of-characters 0 first-word-length)))
-      (initial-value (list first-word first-word-length)))
-  (funcall (-compose #'seq-first (apply-partially #'seq-reduce (apply-partially #'generate--n-words-reducer string-of-characters))) rest-of-list initial-value)))
+	  (first-word (list (seq-subseq string-of-characters 0 first-word-length)))
+	  (initial-value (list first-word first-word-length)))
+    (funcall (-compose #'seq-first (apply-partially #'seq-reduce (apply-partially #'generate--n-words-reducer string-of-characters))) rest-of-list initial-value)))
 
 (defun generate-n-alpha-string-characters (character-count)
   "Returns a random list of alphabetic string characters.
@@ -1326,12 +1326,12 @@ to CHARACTER-COUNT."
   "Returns a random list of words.
 The number of words will be equal to WORD-COUNT."
   (-let* (((word-lengths character-count) (funcall (-compose (-juxt #'identity #'-sum) #'generate-shuffle-list #'-iota) word-count (generate-random-nat-number-in-range (list 3 6))))
-       (string-of-characters (generate-n-length-word character-count))
-       (words (generate--list-of-n-words-helper word-lengths string-of-characters)))
+	  (string-of-characters (generate-n-length-word character-count))
+	  (words (generate--list-of-n-words-helper word-lengths string-of-characters)))
     (if (length> words word-count) (butlast words) words)))
 
 (defalias 'generate-list-of-n-strings #'generate-list-of-n-words
-    "Returns a random list of words.
+  "Returns a random list of words.
 The number of words will be equal
 to WORD-COUNT. Alias for `generate-list-of-n-words'.")
 
@@ -1350,17 +1350,17 @@ Alias for `generate-random-list-of-words'.")
 Each string is guranteed to be unique.")
 
 (defun generate--list-of-n-sentences-base (sentence-count &optional extra-generators)
-      "Returns a list of sentences.
+  "Returns a list of sentences.
 The number of lines will be equal to SENTENCE-COUNT.
 The keyword :EXTRA-GENERATORS takes a list.
 Each generator must take no arguments and a return a string.
 Each generator will be called a random number of times."
   (-let* ((multiple (generate-random-nat-number-in-range (list 3 10)))
-      (word-count (* multiple sentence-count))
-      (list-of-regular-words (generate-list-of-n-words word-count))
-      (list-of-words-from-gens (-flatten-n 1 (generate-call-each-function-random-times extra-generators)))
-      ((sentence-slices all-words) (funcall (-compose (-juxt (-compose (apply-partially #'take sentence-count) (-rpartial #'seq-split multiple)) #'identity) #'generate-shuffle-list #'append) list-of-regular-words list-of-words-from-gens))
-      (sentences (seq-map (-compose (-rpartial #'concat ".") (apply-partially #'s-join " ")) sentence-slices)))
+	  (word-count (* multiple sentence-count))
+	  (list-of-regular-words (generate-list-of-n-words word-count))
+	  (list-of-words-from-gens (-flatten-n 1 (generate-call-each-function-random-times extra-generators)))
+	  ((sentence-slices all-words) (funcall (-compose (-juxt (-compose (apply-partially #'take sentence-count) (-rpartial #'seq-split multiple)) #'identity) #'generate-shuffle-list #'append) list-of-regular-words list-of-words-from-gens))
+	  (sentences (seq-map (-compose (-rpartial #'concat ".") (apply-partially #'s-join " ")) sentence-slices)))
     (list sentences all-words list-of-regular-words list-of-words-from-gens)))
 
 (defun generate-list-of-n-sentences (n)
@@ -1438,7 +1438,7 @@ or simply :EXACT-LENGTH.
 (defalias 'generate-random-list-of-lists-nat-numbers (apply-partially #'generate-data :list-transformer #'generate-seq-split-random) "Returns a random list of lists of natural numbers.")
 
 (cl-defun generate-list-of-nat-numbers-in-range (range &key (list-transformer #'generate-shuffle-list) min-length max-length exact-length)
-    "Returns a list with COUNT numbers.
+  "Returns a list with COUNT numbers.
 Each number will be within the bounds of RANGE.
 LIST-TRANSFORMER can be used to transform the
 list itself.  MIN-LENGTH, MAX-LENGTH and EXACT-LENGTH
@@ -1737,15 +1737,15 @@ or YYYY MM DD format.")
 
 ;; use keywords args for with-padding
 (cl-defun generate--create-random-full-date-string (join-on &key (with-padding nil with-padding-supplied-p))
-    "Returns a random date where parts are joined with JOIN-ON.
+  "Returns a random date where parts are joined with JOIN-ON.
 If WITH-PADDING is true, the month and day
 will always be at least two characters,
 e.g. 01 instead of 1 for the 1st."
   (-let* ((padding-p (or (and with-padding-supplied-p with-padding) (generate-random-boolean)))
-	(string--converter (or (and padding-p #'generate--number-to-padded-string) #'number-to-string))
-	((year-number year-string) (funcall (-juxt #'identity #'number-to-string) (generate-random-year-number)))
-	((month-number month-string) (funcall (-juxt #'identity string--converter) (generate-random-month-number)))
-	(day-string (funcall (-compose string--converter #'generate-random-day-number) year-number month-number)))
+	  (string--converter (or (and padding-p #'generate--number-to-padded-string) #'number-to-string))
+	  ((year-number year-string) (funcall (-juxt #'identity #'number-to-string) (generate-random-year-number)))
+	  ((month-number month-string) (funcall (-juxt #'identity string--converter) (generate-random-month-number)))
+	  (day-string (funcall (-compose string--converter #'generate-random-day-number) year-number month-number)))
     (generate--call-random-full-date-formatter (list join-on year-string month-string day-string))))
 
 (defalias 'generate--month-full-year (lambda (join-on year month) (concat month join-on year)) "Join YEAR and MONTH with JOIN-ON,
@@ -1771,9 +1771,9 @@ If WITH-PADDING is true, the month will always
 be at least two characters, e.g. 01 instead
 of 1 for january."
   (let* ((padding-p (or (and with-padding-supplied-p with-padding) (generate-random-boolean)))
-	  (string--converter (or (and padding-p #'generate--number-to-padded-string) #'number-to-string))
-	  (year-string (funcall (-compose #'number-to-string #'generate-random-year-number)))
-	  (month-string (funcall (-compose string--converter #'generate-random-month-number))))
+	 (string--converter (or (and padding-p #'generate--number-to-padded-string) #'number-to-string))
+	 (year-string (funcall (-compose #'number-to-string #'generate-random-year-number)))
+	 (month-string (funcall (-compose string--converter #'generate-random-month-number))))
     (generate--call-random-short-date-formatter (list join-on year-string month-string))))
 
 (defalias 'generate-random-full-slash-date-string (apply-partially #'generate--create-random-full-date-string "/") "Returns a random date
@@ -1835,13 +1835,13 @@ MM-YYYY ")
 (defalias 'generate-random-card-number (apply-partially #'generate-data :min-length 16 :max-length 16 :item-transformer #'generate--get-next-num-between-zero-and-nine-string :list-transformer #'generate--create-random-card-number) "Returns a random 16-digit card number.")
 
 (defun generate--random-identifier-string (item-transformer)
- "Returns a random identifier string.
+  "Returns a random identifier string.
 The string will contain at least one numeric character
 and at least two characters from the values
 created by ITEM-TRANSFORMER."
- (let* ((letters (generate-data :min-length 2 :max-length 10 :item-transformer item-transformer))
-      (nums (generate-data :min-length 1 :max-length 10 :item-transformer #'number-to-string)))
-   (funcall (-compose (apply-partially #'s-join "") #'generate-shuffle-list #'append) letters nums)))
+  (let* ((letters (generate-data :min-length 2 :max-length 10 :item-transformer item-transformer))
+	 (nums (generate-data :min-length 1 :max-length 10 :item-transformer #'number-to-string)))
+    (funcall (-compose (apply-partially #'s-join "") #'generate-shuffle-list #'append) letters nums)))
 
 (defalias 'generate-random-string-of-lower-alphanums (apply-partially #'generate--random-identifier-string #'generate--get-next-lower-alpha-string) "Create a random alphanumeric identifier string.
 All alphabetic characters will be in lowercase.")
@@ -1871,10 +1871,10 @@ Each string is an org-table row.
 (defun generate--org-table-val-generator-caller (val-generator columns cell-num)
   (let ((current-col (1+ (% cell-num columns)))
 	(current-row (1+ (floor cell-num columns))))
-  (funcall val-generator (list current-row current-col))))
+    (funcall val-generator (list current-row current-col))))
 
 (defun generate--org-table-cell-values-helper (val-generator rows columns)
- (funcall (-compose (apply-partially #'-partition columns) (-rpartial #'generate--times (apply-partially #'generate--org-table-val-generator-caller val-generator columns)) #'*) rows columns))
+  (funcall (-compose (apply-partially #'-partition columns) (-rpartial #'generate--times (apply-partially #'generate--org-table-val-generator-caller val-generator columns)) #'*) rows columns))
 
 (defun generate--org-table-without-hlines (val-generator rows columns)
   "Use ROWS, COLUMNS and VAL-GENERATOR to create an org-table.
@@ -1944,19 +1944,19 @@ not have hlines.
 \(fn FUNCTION VAL-GENERATOR ROWS COLUMNS)")
 
 (defun generate--with-buffer-with-org-table-helper (gen gen-args body)
-    "Use GEN and GEN-ARGS to create an org-table.
+  "Use GEN and GEN-ARGS to create an org-table.
 Then, execute BODY in buffer with the org-table."
   (cl-with-gensyms (org-table)
     `(let ((,org-table (apply #',gen ,gen-args)))
        (with-temp-buffer
-       (org-mode)
-       (insert ,org-table)
-       (goto-char (org-table-begin))
-       (font-lock-ensure (point-min) (point-max))
-       ,@body))))
+	 (org-mode)
+	 (insert ,org-table)
+	 (goto-char (org-table-begin))
+	 (font-lock-ensure (point-min) (point-max))
+	 ,@body))))
 
 (cl-defmacro generate-with-buffer-with-org-table-without-hlines (org-table-args &rest body)
-    "Use ORG-TABLE-ARGS and use them to create a buffer with a table.
+  "Use ORG-TABLE-ARGS and use them to create a buffer with a table.
 The table will not have hlines.
 BODY will be executed in the buffer
 with the point at the beginning
@@ -1965,7 +1965,7 @@ of the table."
   (generate--with-buffer-with-org-table-helper #'generate-org-table-without-hlines org-table-args body))
 
 (cl-defmacro generate-with-buffer-with-org-table-with-hlines (org-table-args &rest body)
-    "Use ORG-TABLE-ARGS and use them to create a buffer with a table.
+  "Use ORG-TABLE-ARGS and use them to create a buffer with a table.
 The table will not have hlines.
 BODY will be executed in the buffer
 with the point at the beginning
@@ -1974,7 +1974,7 @@ of the table."
   (generate--with-buffer-with-org-table-helper #'generate-org-table-with-hlines org-table-args body))
 
 (cl-defmacro generate-with-buffer-with-org-table (org-table-args &rest body)
-    "Use ORG-TABLE-ARGS and use them to create a buffer with a table.
+  "Use ORG-TABLE-ARGS and use them to create a buffer with a table.
 The table may or may not have hlines.
 BODY will be executed in the buffer
 with the point at the beginning
@@ -2023,16 +2023,16 @@ will return."
 	    (,docstring-last-line "\(fn WITH-TIME)"))
        (if ,listp
 	   (cl-function (lambda (,with-time ,count &optional (,order 'random))
-	     (:documentation (s-join "\n" (list ,docstring-line-one
-						,docstring-line-two
-						,docstring-line-three
-						,docstring-line-four
-						,docstring-line-five
-						"\n"
-						,docstring-last-line)))
-	     (mapcar
-	      (lambda (,timestamp) (funcall ,transformer ,timestamp ,with-time ,inactive))
-	      (generate-list-of-n-lisp-timestamps ,count :order ,order))))
+			  (:documentation (s-join "\n" (list ,docstring-line-one
+							     ,docstring-line-two
+							     ,docstring-line-three
+							     ,docstring-line-four
+							     ,docstring-line-five
+							     "\n"
+							     ,docstring-last-line)))
+			  (mapcar
+			   (lambda (,timestamp) (funcall ,transformer ,timestamp ,with-time ,inactive))
+			   (generate-list-of-n-lisp-timestamps ,count :order ,order))))
 	 (lambda (,with-time)
 	   (:documentation (s-join "\n" (list ,docstring-line-one
 					      ,docstring-line-two
@@ -2167,7 +2167,7 @@ SYMBOL should be void-function or void-variable."
   "Returns a random wrong-type-argument error."
   (let* ((random-val (generate-random-value))
 	 (pred (funcall (-compose (apply-partially #'-first (lambda (func) (not (funcall func random-val)))) #'generate-shuffle-list) generate--PREDICATES)))
-  (list 'wrong-type-argument pred random-val)))
+    (list 'wrong-type-argument pred random-val)))
 
 (defalias 'generate-arith-error (cl-constantly (list 'arith-error nil)) "Returns a random arith-error.")
 
@@ -2297,12 +2297,12 @@ SYMBOL should be void-function or void-variable."
 
 (cl-defun generate--should-form-for-type-x (&key passing assert-symbol)
   (cl-function (lambda (&optional val)
-	       (let ((random-val (or val (generate-random-value))))
-		 (pcase-exhaustive random-val
-		   ((pred seqp) (generate--seq-should passing assert-symbol random-val))
-		   ((pred mapp) (generate--map-should passing assert-symbol random-val))
-		   ((pred symbolp) (generate--symbol-should passing assert-symbol random-val))
-		   (_ (generate--catchall-should passing assert-symbol random-val)))))))
+		 (let ((random-val (or val (generate-random-value))))
+		   (pcase-exhaustive random-val
+		     ((pred seqp) (generate--seq-should passing assert-symbol random-val))
+		     ((pred mapp) (generate--map-should passing assert-symbol random-val))
+		     ((pred symbolp) (generate--symbol-should passing assert-symbol random-val))
+		     (_ (generate--catchall-should passing assert-symbol random-val)))))))
 
 (defalias 'generate-passing-should-form (generate--should-form-for-type-x :passing t :assert-symbol 'should)
   "Returns a random passing should form.")
@@ -2317,19 +2317,19 @@ SYMBOL should be void-function or void-variable."
   "Returns a random failing should-not form.")
 
 (defalias 'generate-random-passing-should (apply-partially #'generate-call-random-function (list #'generate-passing-should-form
-											  #'generate-passing-should-not-form))
+												 #'generate-passing-should-not-form))
   "Returns a random passing should form.
 The actual asserter will be either `should' or `should-not'.")
 
 (defalias 'generate-random-failing-should (apply-partially #'generate-call-random-function (list #'generate-failing-should-form
-											  #'generate-failing-should-not-form))
+												 #'generate-failing-should-not-form))
   "Returns a random failing should form.
 The actual asserter will be either `should' or `should-not'.")
 
 (defalias 'generate-random-should (apply-partially #'generate-call-random-function (list #'generate-passing-should-form
-										  #'generate-passing-should-not-form
-										  #'generate-failing-should-form
-										  #'generate-failing-should-not-form))
+											 #'generate-passing-should-not-form
+											 #'generate-failing-should-form
+											 #'generate-failing-should-not-form))
   "Returns a random should form.
 The actual asserter will be either `should' or `should-not'.
 The form itself may be a passing form or a failing form.")
@@ -2362,7 +2362,7 @@ One of those forms will be a failing form.")
   "Returns a random list of passing should forms.")
 
 (defun generate--ert-test-failed-error (failing-should)
-    "Returns a valid `ert-test-failed' error.
+  "Returns a valid `ert-test-failed' error.
 FAILING-SHOULD should be a valid `should', e.g., (should (equal x y))."
   (list 'ert-test-failed (list failing-should :form (cadr failing-should) :value nil)))
 
