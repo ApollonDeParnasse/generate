@@ -1675,18 +1675,42 @@ Each timestamp will be in the
 
 (defalias 'generate-random-lisp-timestamp-range-with-duration (-compose #'generate--lisp-timestamp-range-duration-helper #'generate-random-lisp-timestamp-range))
 
-(defun generate--list-of-n-lisp-timestamp-ranges-helper (n minus-bottom PLUS-TOP)
-    (-let* (((min hz range-length) (generate--create-timestamp-range-around-current-time minus-bottom PLUS-TOP))
-	    (range-indices (generate-list-of-nat-numbers-in-range (list 0 range-length) :exact-length (* n 2)))
-	    (timestamps (generate--timestamp-range-indices-to-timestamps hz min range-indices))
-	    (raw-ranges (-partition 2 timestamps)))
-      (mapcar (-rpartial #'sort :key #'car) raw-ranges)))
+(defun generate--list-of-n-lisp-timestamps-helper (n minus-bottom plus-top order)
+  (-let* (((min hz range-length) (generate--create-timestamp-range-around-current-time minus-bottom plus-top))
+	  (indices (generate-list-of-nat-numbers-in-range (list 0 range-length) :exact-length n))
+	  (range-indices (pcase order
+			   (`random indices)
+			   (`asc (sort indices))
+			   (`desc (sort indices :reverse t)))))
+    (generate--timestamp-range-indices-to-timestamps hz min range-indices)))
 
-(cl-defun generate-list-of-n-lisp-timestamp-ranges (n &optional (range-size generate-lisp-timestamp-range-size))
-  "Returns N Lisp timestamp ranges.
+(defun generate--list-of-n-lisp-timestamp-ranges-helper (n minus-bottom plus-top order)
+  (-let* ((timestamps (generate--list-of-n-lisp-timestamps-helper (* n 2) minus-bottom plus-top order))
+	  (raw-ranges (-partition 2 timestamps)))
+    (if (not (equal order 'asc))
+	(mapcar (-rpartial #'sort :key #'car) raw-ranges)
+      raw-ranges)))
+
+(cl-defun generate-list-of-n-lisp-timestamps (n &key (range-size generate-lisp-timestamp-range-size) (order 'random))
+  "Returns N timestamps.
 RANGE-SIZE can be used to widen or shrink the range.
-Timestamps will be in the (TICKS . HZ) format."
-  (generate--list-of-n-lisp-timestamp-ranges-helper n (floor range-size 2) (floor range-size 2)))
+Timestamps will be in the (TICKS . HZ) format.
+ORDER can optionally be used to set the order
+of the list.  The value of order should be `asc',
+`desc' or `random'.  By default, the list will be unordered."
+  (generate--list-of-n-lisp-timestamps-helper n (floor range-size 2) (floor range-size 2) order))
+
+(defalias 'generate-random-list-of-lisp-timestamps (generate-default-convert-n-gen-to-random #'generate-list-of-n-lisp-timestamps) "Returns a random list of lisp timestamps.
+Timestamps will be in the (TICKS . HZ) format.")
+
+(cl-defun generate-list-of-n-lisp-timestamp-ranges (n &key (range-size generate-lisp-timestamp-range-size) (order 'random))
+  "Returns N timestamp ranges.
+RANGE-SIZE can be used to widen or shrink the range.
+Timestamps will be in the (TICKS . HZ) format.
+ORDER can optionally be used to set the order
+of the list.  The value of order should be `asc',
+`desc' or `random'.  By default, the list will be unordered."
+  (generate--list-of-n-lisp-timestamp-ranges-helper n (floor range-size 2) (floor range-size 2) order))
 
 (defalias 'generate--list-of-n-unzipped-starts-ends-durations (-compose #'-unzip-lists (apply-partially #'mapcar #'generate--lisp-timestamp-range-duration-helper) #'generate-list-of-n-lisp-timestamp-ranges))
 
@@ -1959,28 +1983,77 @@ of the table."
   (generate--with-buffer-with-org-table-helper #'generate-org-table org-table-args body))
 
 (defun generate--org-timestamp-string (lisp-timestamp with-time inactive)
+  "Helper function used to created org timestamp strings.
+LISP-TIMESTAMP should be a pair of integers (TICKS . HZ).
+When WITH-TIME is non-nil, the timestamp will have a start
+time.  When INACTIVE is non-nil, the timestamp will be
+surrounded with [] instead of <>."
   (format-time-string
    (org-time-stamp-format with-time inactive)
    lisp-timestamp))
 
-(cl-defun generate--org-timestamp (inactive &optional (transformer #'generate--org-timestamp-string) (type "string"))
-  (lambda (with-time)
-    (:documentation (format "Returns an %s org timestamp %s.
+(cl-defmacro generate--create-org-timestamp-generator (inactive &key (listp nil) (transformer '#'generate--org-timestamp-string) (type "string"))
+  "Function used to created generators of org-timestamp strings.
+When INACTIVE is non-nil, the returned function will only
+create inactive timestamps.  TRANSFORMER should be a function
+that takes three arguments: the generated list timestamp,(TICKS . HZ),
+with-time, a boolean value, and inactive, a boolean value.
+TYPE should be the type of the value that the function
+will return."
+  (cl-with-gensyms (inactivep return-type
+			      with-time
+			      count
+			      order
+			      timestamp
+			      docstring-line-one
+			      docstring-line-two
+			      docstring-line-three
+			      docstring-line-four
+			      docstring-line-five
+			      docstring-last-line)
+    `(let* ((,inactivep (if ,inactive "inactive" "active"))
+	    (,return-type (if ,listp (concat ,type "s") ,type))
+	    (,docstring-line-one (if ,listp
+				     (format "Returns a list of %s org timestamps %ss." ,inactivep ,return-type)
+				   (format "Returns an %s org timestamp %s." ,inactivep ,return-type)))
+	    (,docstring-line-two (format "WHEN WITH-TIME is non-nil, %s timestamp" (if ,listp "each" "the")))
+	    (,docstring-line-three "will have a start time.")
+	    (,docstring-line-four "ORDER can optionally be used to set the order of the timestamps.")
+	    (,docstring-line-five "The value of order should be `asc', `desc' or `random'.")
+	    (,docstring-last-line "\(fn WITH-TIME)"))
+       (if ,listp
+	   (cl-function (lambda (,with-time ,count &optional (,order 'random))
+	     (:documentation (s-join "\n" (list ,docstring-line-one
+						,docstring-line-two
+						,docstring-line-three
+						,docstring-line-four
+						,docstring-line-five
+						"\n"
+						,docstring-last-line)))
+	     (mapcar
+	      (lambda (,timestamp) (funcall ,transformer ,timestamp ,with-time ,inactive))
+	      (generate-list-of-n-lisp-timestamps ,count :order ,order))))
+	 (lambda (,with-time)
+	   (:documentation (s-join "\n" (list ,docstring-line-one
+					      ,docstring-line-two
+					      ,docstring-line-three
+					      "\n"
+					      ,docstring-last-line)))
+	   (funcall
+	    ,transformer
+	    (generate-random-lisp-timestamp)
+	    ,with-time
+	    ,inactive))))))
 
-\(fn WITH-TIME)" (if inactive "inactive" "active") type))
-    (funcall
-     transformer
-     (generate-random-lisp-timestamp)
-     with-time
-     inactive)))
 
-(defalias 'generate-inactive-org-timestamp-string (generate--org-timestamp t))
 
-(defalias 'generate-random-inactive-org-timestamp-string (-compose #'generate-inactive-org-timestamp-string #'generate-random-boolean) "Returns an inactive org timestamp.
+(defalias 'generate-inactive-org-timestamp-string (generate--create-org-timestamp-generator t))
+
+(defalias 'generate-random-inactive-org-timestamp-string (-compose #'generate-inactive-org-timestamp-string #'generate-random-boolean) "Returns an inactive org timestamp string.
 The timestamp may or may not have
 a start time.")
 
-(defalias 'generate-active-org-timestamp-string (generate--org-timestamp nil))
+(defalias 'generate-active-org-timestamp-string (generate--create-org-timestamp-generator nil))
 
 (defalias 'generate-random-active-org-timestamp-string  (-compose #'generate-active-org-timestamp-string #'generate-random-boolean) "Returns an active org timestamp.
 The timestamp may or may not have
@@ -1990,27 +2063,94 @@ a start time.")
   "Returns a random org timestamp.
 If WITH-TIME is t, the timestamp
 will have a start time."
-  (funcall (generate--org-timestamp (generate-random-boolean)) with-time))
+  (funcall (generate--create-org-timestamp-generator (generate-random-boolean)) with-time))
 
 (defalias 'generate-random-org-timestamp-string (-compose #'generate-org-timestamp-string #'generate-random-boolean) "Returns a random org timestamp.
 The timestamp may or may not be inactive.
 The timestamp may or may not have a
 start time.")
 
-(defalias 'generate-random-inactive-org-timestamp-element (generate--org-timestamp t #'org-timestamp-from-time "element"))
+(defalias 'generate-list-of-n-inactive-org-timestamp-strings (generate--create-org-timestamp-generator t :listp t))
 
-(defalias 'generate-random-active-org-timestamp-element (generate--org-timestamp nil #'org-timestamp-from-time "element"))
+(defalias 'generate-random-list-of-inactive-org-timestamp-strings (generate-default-convert-n-gen-to-random (lambda (count) (generate-list-of-n-inactive-org-timestamp-strings (generate-random-boolean) count))) "Returns a list of inactive org timestamp strings.
+The timestamps may or may not have
+a start time.")
+
+(defalias 'generate-list-of-n-active-org-timestamp-strings (generate--create-org-timestamp-generator nil :listp t))
+
+(defalias 'generate-random-list-of-active-org-timestamp-strings (generate-default-convert-n-gen-to-random (lambda (count) (generate-list-of-n-active-org-timestamp-strings (generate-random-boolean) count))) "Returns a list of active org timestamp strings.
+The timestamps may or may not have
+a start time.")
+
+(defun generate-list-of-n-org-timestamp-strings (with-time n)
+  "Returns a list with N org timestamp strings.
+If WITH-TIME is t, the timestamp
+will have a start time."
+  (funcall (generate--create-org-timestamp-generator (generate-random-boolean) :listp t) with-time n))
+
+(defalias 'generate-random-list-of-org-timestamp-strings (generate-default-convert-n-gen-to-random (lambda (count) (generate-list-of-n-org-timestamp-strings (generate-random-boolean) count))) "Returns a random list of org timestamp strings.")
+
+(defalias 'generate-inactive-org-timestamp-element (generate--create-org-timestamp-generator t :transformer #'org-timestamp-from-time :type "element"))
+
+(defalias 'generate-random-inactive-org-timestamp-element (-compose #'generate-inactive-org-timestamp-element #'generate-random-boolean) "Returns a random inactive org timestamp element.
+The timestamp may or may not have a start time.")
+
+(defalias 'generate-active-org-timestamp-element (generate--create-org-timestamp-generator nil :transformer #'org-timestamp-from-time :type "element"))
+
+(defalias 'generate-random-active-org-timestamp-element (-compose #'generate-active-org-timestamp-element #'generate-random-boolean) "Returns a random active org timestamp element.
+The timestamp may or may not have a start time.")
 
 (defun generate-org-timestamp-element (with-time)
   "Returns a random org timestamp element.
 If WITH-TIME is t, the timestamp
 will have a start time."
-  (funcall (generate--org-timestamp (generate-random-boolean) #'org-timestamp-from-time "element") with-time))
+  (funcall (generate--create-org-timestamp-generator (generate-random-boolean) :transformer #'org-timestamp-from-time :type "element") with-time))
 
 (defalias 'generate-random-org-timestamp-element (-compose #'generate-org-timestamp-element #'generate-random-boolean) "Returns a random org timestamp.
 The timestamp may or may not be inactive.
 The timestamp may or may not have a
 start time.")
+
+(defalias 'generate-list-of-n-inactive-org-timestamp-elements (generate--create-org-timestamp-generator t :listp t :transformer #'org-timestamp-from-time :type "element"))
+
+(defalias 'generate-random-list-of-inactive-org-timestamp-elements (generate-default-convert-n-gen-to-random (lambda (count) (generate-list-of-n-inactive-org-timestamp-elements (generate-random-boolean) count))) "Returns a list of inactive org timestamp elements.
+The timestamps may or may not have
+a start time.")
+
+(defalias 'generate-list-of-n-active-org-timestamp-elements (generate--create-org-timestamp-generator nil :listp t :transformer #'org-timestamp-from-time :type "element"))
+
+(defalias 'generate-random-list-of-active-org-timestamp-elements (generate-default-convert-n-gen-to-random (lambda (count) (generate-list-of-n-active-org-timestamp-elements (generate-random-boolean) count))) "Returns a list of active org timestamp elements.
+The timestamps may or may not have
+a start time.")
+
+(defun generate-list-of-n-org-timestamp-elements (with-time n)
+  "Returns a list with N org timestamp elements.
+If WITH-TIME is t, the timestamp
+will have a start time."
+  (funcall (generate--create-org-timestamp-generator (generate-random-boolean) :listp t :transformer #'org-timestamp-from-time :type "element") with-time n))
+
+(defalias 'generate-random-list-of-org-timestamp-elements (generate-default-convert-n-gen-to-random (lambda (count) (generate-list-of-n-org-timestamp-elements (generate-random-boolean) count))) "Returns a random list of org timestamp elements.")
+
+(defun generate--list-of-n-org-state-change-notes (from to timestamps)
+  "Returns a list of N org state change notes.
+FROM and TO can be used to set the from state
+and to state of each change note. A org state
+change note will be created for each timestamp
+in TIMESTAMPS."
+  (mapcar (lambda (timestamp) (format "- State \"%s\"       from \"%s\"       %s" to from timestamp)) timestamps))
+
+(cl-defun generate-list-of-n-org-state-change-notes (n &key (from "TODO") (to "DONE") (order 'desc))
+  "Returns a list of N org state change notes.
+:[:from STRING] and [:to STRING] can be used to
+set the from state and to state of each change
+note."
+  (generate--list-of-n-org-state-change-notes from to (generate-list-of-n-inactive-org-timestamp-strings t n order)))
+
+(defalias 'generate-random-list-of-org-state-change-notes (generate-default-convert-n-gen-to-random #'generate-list-of-n-org-state-change-notes) "Returns a random list of org state change notes.")
+
+(defalias 'generate-block-of-n-org-state-change-notes (-compose (-partial #'s-join "\n") #'generate-list-of-n-org-state-change-notes) "Returns a block of text with N org state change notes.")
+
+(defalias 'generate-random-block-of-org-state-change-notes (generate-default-convert-n-gen-to-random #'generate-block-of-n-org-state-change-notes) "Returns a random block of org state change notes.")
 
 (defun generate--random-void-x-error (symbol)
   "Returns a closure that will generate a random void type error.
@@ -2462,7 +2602,7 @@ called a random amount of times."
       (concat subheading-stars " " alias-name  "\n" src-block-start "\n" alias "\n" src-block-end))))
 
 (defun generate--generate-composite-generators-for-type-x (function-creators top-level-stars subheading-stars src-block-start src-block-end)
-  "Returns a function that will create a list of functons.
+  "Returns a function that will create a list of functions.
 Each function in FUNCTION-CREATORS should be a list of functions."
   (lambda (type gens)
     (let ((funcs-list (mapconcat (generate--generate-composite-generators-tree-for-type-x subheading-stars src-block-start src-block-end type gens) function-creators "\n"))

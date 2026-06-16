@@ -407,12 +407,6 @@ Each chunk will be LENGTH long."
   (funcall (-compose (-rpartial #'generate-seq-n-random-chunks-of-size-x n seq) #'generate--seq-random-chunk-length) seq))
 #+end_src
 ** map
-*** map-into
-#+begin_src emacs-lisp :tangle yes
-(defalias 'generate--map-into-alist (-rpartial #'map-into 'alist))
-(defalias 'generate--map-into-plist (-rpartial #'map-into 'plist))
-(defalias 'generate--map-into-hash-table (-rpartial #'map-into 'hash-table))
-#+end_src
 *** extensions
 **** generate-map-random-key
 #+begin_src emacs-lisp :tangle yes
@@ -798,13 +792,32 @@ Each timestamp will be in the
 #+begin_src elisp :tangle yes
 (defalias 'generate-random-lisp-timestamp-range-with-duration (-compose #'generate--lisp-timestamp-range-duration-helper #'generate-random-lisp-timestamp-range))
 #+end_src
+*** generate-list-of-n-lisp-timestamps
+#+begin_src elisp :tangle yes
+(cl-defun generate-list-of-n-lisp-timestamps (n &key (range-size generate-lisp-timestamp-range-size) (order 'random))
+  "Returns N timestamps.
+RANGE-SIZE can be used to widen or shrink the range.
+Timestamps will be in the (TICKS . HZ) format.
+ORDER can optionally be used to set the order
+of the list.  The value of order should be `asc',
+`desc' or `random'.  By default, the list will be unordered."
+  (generate--list-of-n-lisp-timestamps-helper n (floor range-size 2) (floor range-size 2) order))
+#+end_src
+*** generate-random-list-of-lisp-timestamps
+#+begin_src elisp :tangle yes
+(defalias 'generate-random-list-of-lisp-timestamps (generate-default-convert-n-gen-to-random #'generate-list-of-n-lisp-timestamps) "Returns a random list of lisp timestamps.
+Timestamps will be in the (TICKS . HZ) format.")
+#+end_src
 *** generate-list-of-n-lisp-timestamp-ranges
 #+begin_src elisp :tangle yes
-(cl-defun generate-list-of-n-lisp-timestamp-ranges (n &optional (range-size generate-lisp-timestamp-range-size))
-  "Returns N Lisp timestamp ranges.
+(cl-defun generate-list-of-n-lisp-timestamp-ranges (n &key (range-size generate-lisp-timestamp-range-size) (order 'random))
+  "Returns N timestamp ranges.
 RANGE-SIZE can be used to widen or shrink the range.
-Timestamps will be in the (TICKS . HZ) format."
-  (generate--list-of-n-lisp-timestamp-ranges-helper n (floor range-size 2) (floor range-size 2)))
+Timestamps will be in the (TICKS . HZ) format.
+ORDER can optionally be used to set the order
+of the list.  The value of order should be `asc',
+`desc' or `random'.  By default, the list will be unordered."
+  (generate--list-of-n-lisp-timestamp-ranges-helper n (floor range-size 2) (floor range-size 2) order))
 #+end_src
 ** dates
 *** generate-random-full-dash-date-string
@@ -962,22 +975,22 @@ of the table."
   (generate--with-buffer-with-org-table-helper #'generate-org-table org-table-args body))
 #+end_src
 *** timestamps
-**** strings
+**** single strings
 ***** inactive timestamps strings
 ****** generate-inactive-org-timestamp-string
 #+begin_src elisp :tangle yes
-(defalias 'generate-inactive-org-timestamp-string (generate--org-timestamp t))
+(defalias 'generate-inactive-org-timestamp-string (generate--create-org-timestamp-generator t))
 #+end_src
 ****** generate-random-inactive-org-timestamp-string
 #+begin_src elisp :tangle yes
-(defalias 'generate-random-inactive-org-timestamp-string (-compose #'generate-inactive-org-timestamp-string #'generate-random-boolean) "Returns an inactive org timestamp.
+(defalias 'generate-random-inactive-org-timestamp-string (-compose #'generate-inactive-org-timestamp-string #'generate-random-boolean) "Returns an inactive org timestamp string.
 The timestamp may or may not have
 a start time.")
 #+end_src
 ***** active timestamps strings
 ****** generate-active-org-timestamp-string
 #+begin_src elisp :tangle yes
-(defalias 'generate-active-org-timestamp-string (generate--org-timestamp nil))
+(defalias 'generate-active-org-timestamp-string (generate--create-org-timestamp-generator nil))
 #+end_src
 ****** generate-random-active-org-timestamp-string
 #+begin_src elisp :tangle yes
@@ -991,7 +1004,7 @@ a start time.")
   "Returns a random org timestamp.
 If WITH-TIME is t, the timestamp
 will have a start time."
-  (funcall (generate--org-timestamp (generate-random-boolean)) with-time))
+  (funcall (generate--create-org-timestamp-generator (generate-random-boolean)) with-time))
 #+end_src
 ***** generate-random-org-timestamp-string
 #+begin_src elisp :tangle yes
@@ -1000,14 +1013,59 @@ The timestamp may or may not be inactive.
 The timestamp may or may not have a
 start time.")
 #+end_src
-**** org-elements
+**** list of strings
+***** inactive timestamps [2/2]
+****** generate-list-of-n-inactive-org-timestamp-strings
+#+begin_src elisp :tangle yes
+(defalias 'generate-list-of-n-inactive-org-timestamp-strings (generate--create-org-timestamp-generator t :listp t))
+#+end_src
+****** generate-random-list-of-inactive-org-timestamp-strings
+#+begin_src elisp :tangle yes
+(defalias 'generate-random-list-of-inactive-org-timestamp-strings (generate-default-convert-n-gen-to-random (lambda (count) (generate-list-of-n-inactive-org-timestamp-strings (generate-random-boolean) count))) "Returns a list of inactive org timestamp strings.
+The timestamps may or may not have
+a start time.")
+#+end_src
+***** active timestamps [2/2]
+****** generate-list-of-n-active-org-timestamp-strings
+#+begin_src elisp :tangle yes
+(defalias 'generate-list-of-n-active-org-timestamp-strings (generate--create-org-timestamp-generator nil :listp t))
+#+end_src
+****** generate-random-list-of-active-org-timestamp-strings
+#+begin_src elisp :tangle yes
+(defalias 'generate-random-list-of-active-org-timestamp-strings (generate-default-convert-n-gen-to-random (lambda (count) (generate-list-of-n-active-org-timestamp-strings (generate-random-boolean) count))) "Returns a list of active org timestamp strings.
+The timestamps may or may not have
+a start time.")
+#+end_src
+***** generate-list-of-n-org-timestamp-strings
+#+begin_src elisp :tangle yes
+(defun generate-list-of-n-org-timestamp-strings (with-time n)
+  "Returns a list with N org timestamp strings.
+If WITH-TIME is t, the timestamp
+will have a start time."
+  (funcall (generate--create-org-timestamp-generator (generate-random-boolean) :listp t) with-time n))
+#+end_src
+***** generate-random-list-of-org-timestamp-strings
+#+begin_src elisp :tangle yes
+(defalias 'generate-random-list-of-org-timestamp-strings (generate-default-convert-n-gen-to-random (lambda (count) (generate-list-of-n-org-timestamp-strings (generate-random-boolean) count))) "Returns a random list of org timestamp strings.")
+#+end_src
+**** single org-elements
+***** generate-inactive-org-timestamp-element
+#+begin_src elisp :tangle yes
+(defalias 'generate-inactive-org-timestamp-element (generate--create-org-timestamp-generator t :transformer #'org-timestamp-from-time :type "element"))
+#+end_src
 ***** generate-random-inactive-org-timestamp-element
 #+begin_src elisp :tangle yes
-(defalias 'generate-random-inactive-org-timestamp-element (generate--org-timestamp t #'org-timestamp-from-time "element"))
+(defalias 'generate-random-inactive-org-timestamp-element (-compose #'generate-inactive-org-timestamp-element #'generate-random-boolean) "Returns a random inactive org timestamp element.
+The timestamp may or may not have a start time.")
+#+end_src
+***** generate-active-org-timestamp-element
+#+begin_src elisp :tangle yes
+(defalias 'generate-active-org-timestamp-element (generate--create-org-timestamp-generator nil :transformer #'org-timestamp-from-time :type "element"))
 #+end_src
 ***** generate-random-active-org-timestamp-element
 #+begin_src elisp :tangle yes
-(defalias 'generate-random-active-org-timestamp-element (generate--org-timestamp nil #'org-timestamp-from-time "element"))
+(defalias 'generate-random-active-org-timestamp-element (-compose #'generate-active-org-timestamp-element #'generate-random-boolean) "Returns a random active org timestamp element.
+The timestamp may or may not have a start time.")
 #+end_src
 ***** generate-org-timestamp-element
 #+begin_src elisp :tangle yes
@@ -1015,7 +1073,7 @@ start time.")
   "Returns a random org timestamp element.
 If WITH-TIME is t, the timestamp
 will have a start time."
-  (funcall (generate--org-timestamp (generate-random-boolean) #'org-timestamp-from-time "element") with-time))
+  (funcall (generate--create-org-timestamp-generator (generate-random-boolean) :transformer #'org-timestamp-from-time :type "element") with-time))
 #+end_src
 ***** generate-random-org-timestamp-element
 #+begin_src elisp :tangle yes
@@ -1023,6 +1081,75 @@ will have a start time."
 The timestamp may or may not be inactive.
 The timestamp may or may not have a
 start time.")
+#+end_src
+**** list of org-elements
+***** inactive timestamps [2/2]
+****** generate-list-of-n-inactive-org-timestamp-elements
+#+begin_src elisp :tangle yes
+(defalias 'generate-list-of-n-inactive-org-timestamp-elements (generate--create-org-timestamp-generator t :listp t :transformer #'org-timestamp-from-time :type "element"))
+#+end_src
+****** generate-random-list-of-inactive-org-timestamp-elements
+#+begin_src elisp :tangle yes
+(defalias 'generate-random-list-of-inactive-org-timestamp-elements (generate-default-convert-n-gen-to-random (lambda (count) (generate-list-of-n-inactive-org-timestamp-elements (generate-random-boolean) count))) "Returns a list of inactive org timestamp elements.
+The timestamps may or may not have
+a start time.")
+#+end_src
+***** active timestamps [2/2]
+****** generate-list-of-n-active-org-timestamp-elements
+#+begin_src elisp :tangle yes
+(defalias 'generate-list-of-n-active-org-timestamp-elements (generate--create-org-timestamp-generator nil :listp t :transformer #'org-timestamp-from-time :type "element"))
+#+end_src
+****** generate-random-list-of-active-org-timestamp-elements
+#+begin_src elisp :tangle yes
+(defalias 'generate-random-list-of-active-org-timestamp-elements (generate-default-convert-n-gen-to-random (lambda (count) (generate-list-of-n-active-org-timestamp-elements (generate-random-boolean) count))) "Returns a list of active org timestamp elements.
+The timestamps may or may not have
+a start time.")
+#+end_src
+***** generate-list-of-n-org-timestamp-elements
+#+begin_src elisp :tangle yes
+(defun generate-list-of-n-org-timestamp-elements (with-time n)
+  "Returns a list with N org timestamp elements.
+If WITH-TIME is t, the timestamp
+will have a start time."
+  (funcall (generate--create-org-timestamp-generator (generate-random-boolean) :listp t :transformer #'org-timestamp-from-time :type "element") with-time n))
+#+end_src
+***** generate-random-list-of-org-timestamp-elements
+#+begin_src elisp :tangle yes
+(defalias 'generate-random-list-of-org-timestamp-elements (generate-default-convert-n-gen-to-random (lambda (count) (generate-list-of-n-org-timestamp-elements (generate-random-boolean) count))) "Returns a random list of org timestamp elements.")
+#+end_src
+*** notes
+**** single notes
+**** list of notes
+***** generate--list-of-n-org-state-change-notes
+#+begin_src elisp :tangle yes
+(defun generate--list-of-n-org-state-change-notes (from to timestamps)
+  "Returns a list of N org state change notes.
+FROM and TO can be used to set the from state
+and to state of each change note. A org state
+change note will be created for each timestamp
+in TIMESTAMPS."
+  (mapcar (lambda (timestamp) (format "- State \"%s\"       from \"%s\"       %s" to from timestamp)) timestamps))
+#+end_src
+***** generate-list-of-n-org-state-change-notes
+#+begin_src elisp :tangle yes
+(cl-defun generate-list-of-n-org-state-change-notes (n &key (from "TODO") (to "DONE") (order 'desc))
+  "Returns a list of N org state change notes.
+:[:from STRING] and [:to STRING] can be used to
+set the from state and to state of each change
+note."
+  (generate--list-of-n-org-state-change-notes from to (generate-list-of-n-inactive-org-timestamp-strings t n order)))
+#+end_src
+***** generate-random-list-of-org-state-change-notes
+#+begin_src elisp :tangle yes
+(defalias 'generate-random-list-of-org-state-change-notes (generate-default-convert-n-gen-to-random #'generate-list-of-n-org-state-change-notes) "Returns a random list of org state change notes.")
+#+end_src
+***** generate-block-of-n-org-state-change-notes
+#+begin_src elisp :tangle yes
+(defalias 'generate-block-of-n-org-state-change-notes (-compose (-partial #'s-join "\n") #'generate-list-of-n-org-state-change-notes) "Returns a block of text with N org state change notes.")
+#+end_src
+***** generate-random-block-of-org-state-change-notes
+#+begin_src elisp :tangle yes
+(defalias 'generate-random-block-of-org-state-change-notes (generate-default-convert-n-gen-to-random #'generate-block-of-n-org-state-change-notes) "Returns a random block of org state change notes.")
 #+end_src
 ** errors
 *** generate-random-void-function-error
