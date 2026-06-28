@@ -2010,7 +2010,8 @@ will return."
 			      docstring-line-three
 			      docstring-line-four
 			      docstring-line-five
-			      docstring-last-line)
+			      list-docstring
+			      single-string-docstring)
     `(let* ((,inactivep (if ,inactive "inactive" "active"))
 	    (,return-type (if ,listp (concat ,type "s") ,type))
 	    (,docstring-line-one (if ,listp
@@ -2020,25 +2021,26 @@ will return."
 	    (,docstring-line-three "will have a start time.")
 	    (,docstring-line-four "ORDER can optionally be used to set the order of the timestamps.")
 	    (,docstring-line-five "The value of order should be `asc', `desc' or `random'.")
-	    (,docstring-last-line "\(fn WITH-TIME)"))
-       (if ,listp
-	   (cl-function (lambda (,with-time ,count &optional (,order 'random))
-			  (:documentation (s-join "\n" (list ,docstring-line-one
-							     ,docstring-line-two
-							     ,docstring-line-three
-							     ,docstring-line-four
-							     ,docstring-line-five
-							     "\n"
-							     ,docstring-last-line)))
-			  (mapcar
-			   (lambda (,timestamp) (funcall ,transformer ,timestamp ,with-time ,inactive))
-			   (generate-list-of-n-lisp-timestamps ,count :order ,order))))
-	 (lambda (,with-time)
-	   (:documentation (s-join "\n" (list ,docstring-line-one
+	    (,list-docstring (s-join "\n" (list ,docstring-line-one
+						,docstring-line-two
+						,docstring-line-three
+						,docstring-line-four
+						,docstring-line-five
+						"\n"
+						"\(fn WITH-TIME N)")))
+	    (,single-string-docstring (s-join "\n" (list ,docstring-line-one
 					      ,docstring-line-two
 					      ,docstring-line-three
 					      "\n"
-					      ,docstring-last-line)))
+					      "\(fn WITH-TIME)"))))
+       (if ,listp
+	   (cl-function (lambda (,count &optional ,with-time (,order 'random))
+			  (:documentation ,list-docstring)
+			  (mapcar
+			   (lambda (,timestamp) (funcall ,transformer ,timestamp ,with-time ,inactive))
+			   (generate-list-of-n-lisp-timestamps ,count :order ,order))))
+	  (lambda (&optional ,with-time)
+	   (:documentation ,single-string-docstring)
 	   (funcall
 	    ,transformer
 	    (generate-random-lisp-timestamp)
