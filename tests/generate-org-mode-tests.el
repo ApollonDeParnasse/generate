@@ -106,7 +106,7 @@
 					      (list (org-table-get test-row-number test-column-number) (org-table-to-lisp)))))
     (should (string-equal actual-cell-value test-cell-value))))
 
-(generate-ert-deftest-n-times generate-inactive-org-timestamp-string-with-time ()
+(generate-ert-deftest-n-times generate-inactive-org-timestamp-string/with-time ()
   :num-runs 100
   (let* ((actual-timestamp (generate-inactive-org-timestamp-string t))
 	 (actual-element (org-timestamp-from-string actual-timestamp)))
@@ -115,9 +115,9 @@
     (should (s-starts-with-p "[" actual-timestamp))
     (should (s-ends-with-p "]" actual-timestamp))))
 
-(generate-ert-deftest-n-times generate-inactive-org-timestamp-string-without-time ()
+(generate-ert-deftest-n-times generate-inactive-org-timestamp-string/without-time ()
   :num-runs 100
-  (let* ((actual-timestamp (generate-inactive-org-timestamp-string nil))
+  (let* ((actual-timestamp (generate-inactive-org-timestamp-string))
 	 (actual-element (org-timestamp-from-string actual-timestamp)))
     (should-not (org-element-property :hour-start actual-element))
     (should-not (org-element-property :minute-start actual-element))
@@ -131,7 +131,7 @@
     (should (s-starts-with-p "[" actual-timestamp))
     (should (s-ends-with-p "]" actual-timestamp))))
 
-(generate-ert-deftest-n-times generate-active-org-timestamp-string-with-time ()
+(generate-ert-deftest-n-times generate-active-org-timestamp-string/with-time ()
   :num-runs 100
   (let* ((actual-timestamp (generate-active-org-timestamp-string t))
 	 (actual-element (org-timestamp-from-string actual-timestamp)))
@@ -140,9 +140,9 @@
     (should (s-starts-with-p "<" actual-timestamp))
     (should (s-ends-with-p ">" actual-timestamp))))
 
-(generate-ert-deftest-n-times generate-active-org-timestamp-string-without-time ()
+(generate-ert-deftest-n-times generate-active-org-timestamp-string/without-time ()
   :num-runs 100
-  (let* ((actual-timestamp (generate-active-org-timestamp-string nil))
+  (let* ((actual-timestamp (generate-active-org-timestamp-string))
 	 (actual-element (org-timestamp-from-string actual-timestamp)))
     (should-not (org-element-property :hour-start actual-element))
     (should-not (org-element-property :minute-start actual-element))
@@ -156,7 +156,7 @@
     (should (s-starts-with-p "<" actual-timestamp))
     (should (s-ends-with-p ">" actual-timestamp))))
 
-(generate-ert-deftest-n-times generate-org-timestamp-string-with-time ()
+(generate-ert-deftest-n-times generate-org-timestamp-string/with-time ()
   :num-runs 100
   (let* ((actual-timestamp (generate-org-timestamp-string t))
 	 (actual-element (org-timestamp-from-string actual-timestamp)))
@@ -164,9 +164,9 @@
     (should (org-element-property :minute-start actual-element))
     (should (string-match-p org-element--timestamp-regexp actual-timestamp))))
 
-(generate-ert-deftest-n-times generate-org-timestamp-string-without-time ()
+(generate-ert-deftest-n-times generate-org-timestamp-string/without-time ()
   :num-runs 100
-  (let* ((actual-timestamp (generate-org-timestamp-string nil))
+  (let* ((actual-timestamp (generate-org-timestamp-string))
 	 (actual-element (org-timestamp-from-string actual-timestamp)))
     (should-not (org-element-property :hour-start actual-element))
     (should-not (org-element-property :minute-start actual-element))
@@ -177,10 +177,10 @@
   (let ((actual-timestamp (generate-random-org-timestamp-string)))
     (should (string-match-p org-element--timestamp-regexp actual-timestamp))))
 
-(generate-ert-deftest-n-times generate-list-of-n-inactive-org-timestamp-strings-with-time ()
+(generate-ert-deftest-n-times generate-list-of-n-inactive-org-timestamp-strings/with-time ()
   :num-runs 100
   (let* ((test-count (generate--random-nat-number-in-range-10))
-	 (actual-timestamps (generate-list-of-n-inactive-org-timestamp-strings t test-count))
+	 (actual-timestamps (generate-list-of-n-inactive-org-timestamp-strings test-count t))
 	 (actual-random-timestamp (generate-seq-take-random-value-from-seq actual-timestamps))
 	 (actual-element (org-timestamp-from-string actual-random-timestamp)))
     (length= actual-timestamps test-count)
@@ -189,10 +189,10 @@
     (should (s-starts-with-p "[" actual-random-timestamp))
     (should (s-ends-with-p "]" actual-random-timestamp))))
 
-(generate-ert-deftest-n-times generate-list-of-n-inactive-org-timestamp-strings-without-time ()
+(generate-ert-deftest-n-times generate-list-of-n-inactive-org-timestamp-strings/without-time ()
   :num-runs 100
   (let* ((test-count (generate--random-nat-number-in-range-10))
-	 (actual-timestamps (generate-list-of-n-inactive-org-timestamp-strings nil test-count))
+	 (actual-timestamps (generate-list-of-n-inactive-org-timestamp-strings test-count))
 	 (actual-random-timestamp (generate-seq-take-random-value-from-seq actual-timestamps))
 	 (actual-element (org-timestamp-from-string actual-random-timestamp)))
     (should (length= actual-timestamps test-count))
@@ -210,10 +210,10 @@
     (should (s-starts-with-p "[" actual-random-timestamp))
     (should (s-ends-with-p "]" actual-random-timestamp))))
 
-(generate-ert-deftest-n-times generate-list-of-n-active-org-timestamp-strings-with-time ()
+(generate-ert-deftest-n-times generate-list-of-n-active-org-timestamp-strings/with-time ()
   :num-runs 100
   (let* ((test-count (generate--random-nat-number-in-range-10))
-	 (actual-timestamps (generate-list-of-n-active-org-timestamp-strings t test-count))
+	 (actual-timestamps (generate-list-of-n-active-org-timestamp-strings test-count t))
 	 (actual-random-timestamp (generate-seq-take-random-value-from-seq actual-timestamps))
 	 (actual-element (org-timestamp-from-string actual-random-timestamp)))
     (should (length= actual-timestamps test-count))
@@ -222,10 +222,10 @@
     (should (s-starts-with-p "<" actual-random-timestamp))
     (should (s-ends-with-p ">" actual-random-timestamp))))
 
-(generate-ert-deftest-n-times generate-list-of-n-active-org-timestamp-strings-without-time ()
+(generate-ert-deftest-n-times generate-list-of-n-active-org-timestamp-strings/without-time ()
   :num-runs 100
   (let* ((test-count (generate--random-nat-number-in-range-10))
-	 (actual-timestamps (generate-list-of-n-active-org-timestamp-strings nil test-count))
+	 (actual-timestamps (generate-list-of-n-active-org-timestamp-strings test-count))
 	 (actual-random-timestamp (generate-seq-take-random-value-from-seq actual-timestamps))
 	 (actual-element (org-timestamp-from-string actual-random-timestamp)))
     (should (length= actual-timestamps test-count))
@@ -243,10 +243,10 @@
     (should (s-starts-with-p "<" actual-random-timestamp))
     (should (s-ends-with-p ">" actual-random-timestamp))))
 
-(generate-ert-deftest-n-times generate-list-of-n-org-timestamp-strings-with-time ()
+(generate-ert-deftest-n-times generate-list-of-n-org-timestamp-strings/with-time ()
   :num-runs 100
   (let* ((test-count (generate--random-nat-number-in-range-10))
-	 (actual-timestamps (generate-list-of-n-org-timestamp-strings t test-count))
+	 (actual-timestamps (generate-list-of-n-org-timestamp-strings test-count t))
 	 (actual-random-timestamp (generate-seq-take-random-value-from-seq actual-timestamps))
 	 (actual-element (org-timestamp-from-string actual-random-timestamp)))
     (should (length= actual-timestamps test-count))
@@ -254,10 +254,10 @@
     (should (org-element-property :minute-start actual-element))
     (should (string-match-p org-element--timestamp-regexp actual-random-timestamp))))
 
-(generate-ert-deftest-n-times generate-list-of-n-org-timestamp-strings-without-time ()
+(generate-ert-deftest-n-times generate-list-of-n-org-timestamp-strings/without-time ()
   :num-runs 100
   (let* ((test-count (generate--random-nat-number-in-range-10))
-	 (actual-timestamps (generate-list-of-n-org-timestamp-strings nil test-count))
+	 (actual-timestamps (generate-list-of-n-org-timestamp-strings test-count))
 	 (actual-random-timestamp (generate-seq-take-random-value-from-seq actual-timestamps))
 	 (actual-element (org-timestamp-from-string actual-random-timestamp)))
     (should (length= actual-timestamps test-count))
@@ -281,7 +281,7 @@
 
 (generate-ert-deftest-n-times generate-inactive-org-timestamp-element-without-start-time ()
   :num-runs 100
-  (let* ((actual-element (generate-inactive-org-timestamp-element nil)))
+  (let* ((actual-element (generate-inactive-org-timestamp-element)))
     (should (equal (org-element-property :type actual-element) 'inactive))
     (should-not (org-element-property :hour-start actual-element))
     (should-not (org-element-property :minute-start actual-element))))
@@ -310,13 +310,13 @@
   (let* ((actual-element (generate-random-active-org-timestamp-element)))
     (should (equal (org-element-property :type actual-element) 'active))))
 
-(generate-ert-deftest-n-times generate-org-timestamp-element-with-time ()
+(generate-ert-deftest-n-times generate-org-timestamp-element/with-time ()
   :num-runs 100
   (let* ((actual-element (generate-org-timestamp-element t)))
     (should (org-element-property :hour-start actual-element))
     (should (org-element-property :minute-start actual-element))))
 
-(generate-ert-deftest-n-times generate-org-timestamp-element-without-time ()
+(generate-ert-deftest-n-times generate-org-timestamp-element/without-time ()
   :num-runs 100
   (let* ((actual-element (generate-org-timestamp-element nil)))
     (should-not (org-element-property :hour-start actual-element))
@@ -327,12 +327,11 @@
   (let* ((actual-element (generate-random-org-timestamp-element)))
     (should (org-element-type-p actual-element 'timestamp))))
 
-(generate-ert-deftest-n-times generate-list-of-n-inactive-org-timestamp-elements-with-start-time ()
+(generate-ert-deftest-n-times generate-list-of-n-inactive-org-timestamp-elements/with-start-time ()
   :num-runs 100
   (let* ((test-count (generate--random-nat-number-in-range-10))
-	 (actual-elements (generate-list-of-n-inactive-org-timestamp-elements t test-count))
+	 (actual-elements (generate-list-of-n-inactive-org-timestamp-elements test-count t))
 	 (actual-element (generate-seq-take-random-value-from-seq actual-elements)))
-    (print actual-element)
     (should (length= actual-elements test-count))
     (should (equal (org-element-property :type actual-element) 'inactive))
     (should (org-element-property :hour-start actual-element))
@@ -341,7 +340,7 @@
 (generate-ert-deftest-n-times generate-list-of-n-inactive-org-timestamp-elements-without-start-time ()
   :num-runs 100
   (let* ((test-count (generate--random-nat-number-in-range-10))
-	 (actual-elements (generate-list-of-n-inactive-org-timestamp-elements nil test-count))
+	 (actual-elements (generate-list-of-n-inactive-org-timestamp-elements test-count nil))
 	 (actual-element (generate-seq-take-random-value-from-seq actual-elements)))
     (should (length= actual-elements test-count))
     (should (equal (org-element-property :type actual-element) 'inactive))
@@ -358,7 +357,7 @@
 (generate-ert-deftest-n-times generate-list-of-n-active-org-timestamp-elements-with-start-time ()
   :num-runs 100
   (let* ((test-count (generate--random-nat-number-in-range-10))
-	 (actual-elements (generate-list-of-n-active-org-timestamp-elements t test-count))
+	 (actual-elements (generate-list-of-n-active-org-timestamp-elements test-count t))
 	 (actual-element (generate-seq-take-random-value-from-seq actual-elements)))
     (should (length= actual-elements test-count))
     (should (equal (org-element-property :type actual-element) 'active))
@@ -368,7 +367,7 @@
 (generate-ert-deftest-n-times generate-list-of-n-active-org-timestamp-elements/without-start-time ()
   :num-runs 100
   (let* ((test-count (generate--random-nat-number-in-range-10))
-	 (actual-elements (generate-list-of-n-active-org-timestamp-elements nil test-count))
+	 (actual-elements (generate-list-of-n-active-org-timestamp-elements test-count))
 	 (actual-element (generate-seq-take-random-value-from-seq actual-elements)))
     (should (length= actual-elements test-count))
     (should (equal (org-element-property :type actual-element) 'active))
@@ -382,10 +381,10 @@
     (should (listp actual-element))
     (should (equal (org-element-property :type actual-element) 'active))))
 
-(generate-ert-deftest-n-times generate-list-of-org-timestamp-elements/with-time ()
+(generate-ert-deftest-n-times generate-list-of-n-org-timestamp-elements/with-time ()
   :num-runs 100
   (let* ((test-count (generate--random-nat-number-in-range-10))
-	 (actual-elements (generate-list-of-n-org-timestamp-elements t test-count))
+	 (actual-elements (generate-list-of-n-org-timestamp-elements test-count t))
 	 (actual-element (generate-seq-take-random-value-from-seq actual-elements)))
     (should (length= actual-elements test-count))
     (should (org-element-property :hour-start actual-element))
@@ -394,7 +393,7 @@
 (generate-ert-deftest-n-times generate-list-of-n-org-timestamp-elements/without-time ()
   :num-runs 100
   (let* ((test-count (generate--random-nat-number-in-range-10))
-	 (actual-elements (generate-list-of-n-org-timestamp-elements nil test-count))
+	 (actual-elements (generate-list-of-n-org-timestamp-elements test-count))
 	 (actual-element (generate-seq-take-random-value-from-seq actual-elements)))
     (should (length= actual-elements test-count))
     (should-not (org-element-property :hour-start actual-element))
@@ -458,7 +457,6 @@
   (let* ((actual-block (generate-random-block-of-org-state-change-notes))
 	 (actual-notes (s-split "\n" actual-block))
 	 (actual-random-note (generate-seq-take-random-value-from-seq actual-notes)))
-    (print actual-block)
     (should (s-starts-with-p "-" actual-random-note))
     (should (s-contains-p "State \"DONE\"" actual-random-note))
     (should (s-contains-p "from \"TODO\"" actual-random-note))
