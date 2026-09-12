@@ -462,6 +462,42 @@
     (should (s-contains-p "from \"TODO\"" actual-random-note))
     (should (string-match-p org-element--timestamp-regexp actual-random-note))))
 
+(generate-ert-deftest-n-times generate-string-with-x-src-block-parameters-mv ()
+  :num-runs 100
+  (-let* ((test-count (generate-random-nat-number-in-range (list 1 5)))
+	  ((actual-value actual-parameter-pairs)
+	   (generate-string-with-x-src-block-parameters-mv test-count))
+	  (actual-random-param-pair
+	   (generate-seq-take-random-value-from-seq
+	    actual-parameter-pairs)))
+    (should (stringp actual-value))
+    (should (length> actual-value test-count))
+    (should-not (s-contains-p ":any" actual-value))
+    (should (consp actual-parameter-pairs))
+    (should (s-starts-with-p ":" (car actual-random-param-pair)))
+    (should-not (seq-contains-p (flatten-tree actual-random-param-pair) ":any"))))
+
+(generate-ert-deftest-n-times generate-string-with-x-src-block-parameters ()
+  :num-runs 100
+  (let* ((test-count (generate-random-nat-number-in-range (list 1 5)))
+	 (actual-value
+	  (generate-string-with-x-src-block-parameters test-count)))
+    (should (stringp actual-value))
+    (should (length> actual-value test-count))
+    (should-not (s-contains-p ":any" actual-value))))
+
+(generate-ert-deftest-n-times generate-random-string-of-src-block-parameters-mv ()
+  :num-runs 100
+  (-let* (((actual-value actual-parameter-pairs) (generate-random-string-of-src-block-parameters-mv)))
+    (should (stringp actual-value))
+    (should (consp actual-parameter-pairs))
+    (should (length> actual-value 1))))
+
+(generate-ert-deftest-n-times generate-random-string-of-src-block-parameters ()
+  :num-runs 100
+  (let* ((actual-value (generate-random-string-of-src-block-parameters)))
+    (should (stringp actual-value))))
+
 ;; Local Variables:
 ;; read-symbol-shorthands: (("g-" . "generate-"))
 ;; End:

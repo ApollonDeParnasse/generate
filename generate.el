@@ -31,6 +31,8 @@
 ;;; Code:
 
 (require 'generate-file-extensions)
+(eval-when-compile
+  (require 'generate-macs))
 (require 'ert)
 (require 'seq)
 (require 'map)
@@ -100,6 +102,9 @@
 (defconst generate--SECONDS-IN-A-YEAR
   (* 60 60 24 30 12))
 
+(defconst generate--SECONDS-IN-TEN-YEARS
+  (* generate--SECONDS-IN-A-YEAR 10))
+
 (defconst generate--FIVERANGE
   (list 1 5))
 (defconst generate--ZEROTENRANGE
@@ -150,7 +155,7 @@
   :tag "generate"
   :group 'lisp)
 
-(defcustom generate-lisp-timestamp-range-size generate--SECONDS-IN-A-YEAR
+(defcustom generate-lisp-timestamp-range-size generate--SECONDS-IN-TEN-YEARS
   "The size of the range from which random timestamps will be taken."
   :group 'generate
   :type 'natnum)
@@ -164,12 +169,6 @@
 (defalias 'generate--equal-one (apply-partially #'eql 1) "equal 1?")
 (defalias 'generate--not-equal (-not #'equal) "not equal?")
 (defalias 'generate--len-gt0 (-rpartial #'length> 0) "less-than-or-equal 0?")
-
-(defmacro generate--plural! (macro args)
-  "Use ARGS to create a plural verson of MACRO."
-  `(progn
-     ,@(seq-map (lambda (p) `(,macro ,p))
-		(symbol-value args))))
 
 (defun generate--plist-get (prop plist)
   "Extract value of PROP from PLIST.
@@ -235,7 +234,8 @@ Each function call will receive the current call number as its argument."
   "Call a FUNC N times with no args and collect the results into an array."
   (generate--times n (lambda (_) (funcall func))))
 
-(defalias 'generate--times-no-args-twice (apply-partially #'generate--times-no-args 2) "Call FUNC twice.
+(defalias 'generate--times-no-args-twice (apply-partially #'generate--times-no-args 2)
+  "Call FUNC twice.
 
 \(fn FUNC)")
 
@@ -261,7 +261,9 @@ returned is equal to the length of the longest input list."
   (declare (pure t) (side-effect-free t))
   (thunk-let* ((length-one (length list-one))
 	       (length-two (length list-two))
-	       (sorted-lists (if (> length-one length-two) (list (list 0 list-one) (list 1 list-two)) (list (list 1 list-two) (list 0 list-one))))
+	       (sorted-lists (if (> length-one length-two)
+				 (list (list 0 list-one) (list 1 list-two))
+			       (list (list 1 list-two) (list 0 list-one))))
 	       (longest-list (cadr (car sorted-lists)))
 	       (shortest-list (cadr sorted-lists)))
     (if (equal length-one length-two)
@@ -276,10 +278,13 @@ followed by a pair with the second element of
 each list, and so on.  The number of pairs
 returned is equal to the length of LIST-ONE."
   (declare (pure t) (side-effect-free t))
-  (-let* (((length-one length-two) (mapcar #'length (list list-one list-two))))
+  (-let* (((length-one length-two)
+	   (mapcar #'length (list list-one list-two))))
     (if (<= length-one length-two)
 	(-zip-pair list-one list-two)
-      (seq-map-indexed (generate--zip-pair-longest-helper (list 1 list-two)) list-one))))
+      (seq-map-indexed (generate--zip-pair-longest-helper
+			(list 1 list-two))
+		       list-one))))
 
 (defun generate--collect-keywords (keys-and-body collection)
   "Helper function for `generate--parse-keys-and-body'.
@@ -292,7 +297,8 @@ KEYS-AND-BODY and adds them to COLLECTION."
      ((and (not first) (not second)) collection)
      ((and (keywordp first) (not second)) (error "Value expected after keyword %S in %S"
 						 first keys-and-body))
-     ((and (keywordp first) second) (generate--collect-keywords rest (generate--plist-put first second collection)))
+     ((and (keywordp first) second) (generate--collect-keywords rest
+								(generate--plist-put first second collection)))
      ((and first (not second)) (generate--plist-put :body first collection))
      ((and first second) (error "Not sure what you did here %S"
  				keys-and-body)))))
@@ -301,8 +307,10 @@ KEYS-AND-BODY and adds them to COLLECTION."
   "Converts DOCSTRING-KEYS-AND-BODY into a plist."
   (declare (pure t) (side-effect-free t))
   (-let (((documentation keys-and-body) (if (stringp (car docstring-keys-and-body))
-					    (list (list :documentation (car docstring-keys-and-body)) (cdr docstring-keys-and-body))
-					  (list (list :documentation nil) docstring-keys-and-body))))
+					    (list (list :documentation (car docstring-keys-and-body))
+						  (cdr docstring-keys-and-body))
+					  (list (list :documentation nil)
+						docstring-keys-and-body))))
     (generate--collect-keywords keys-and-body documentation)))
 
 ;;;###autoload
@@ -344,13 +352,33 @@ If NUM-RUNS is not specified, your test will be defined 100 times.
 			  :body (lambda () ,body nil)
 			  :file-name ,(or (macroexp-file-name) buffer-file-name))))))))
 
-(defun generate--activate-font-lock-keywords ()
-  "Activate font-lock keywords for some of ERT's symbols."
-  (font-lock-add-keywords
-   nil
-   '(("(\\(\\<generate-ert-deftest-n-times\\)\\>\\s *\\(\\(?:\\sw\\|\\s_\\)+\\)?"
-      (1 font-lock-keyword-face nil t)
-      (2 font-lock-function-name-face nil t)))))
+(defconst generate--SYMBOL-TO-HIGHLIGHT
+  (list "generate-ert-deftest-n-times"
+	"generate--defalias-mv!"
+	"generate--defun-mv!"
+	"generate--defun-random!"
+	"generate-with-buffer-with-text"
+	"generate-with-buffer-with-org-table-without-hlines"
+	"generate-with-buffer-with-org-table-with-hlines"
+	"generate-with-buffer-with-org-table"))
+
+(defun generate--create-symbol-regex (symbol-name)
+  (format "(\\(\\<%s\\)\\>\\s *\\(\\(?:\\sw\\|\\s_\\)+\\)?"
+	  symbol-name))
+
+(defun generate--font-lock-keyword-creator (symbol-name)
+  (let ((symbol-regex (generate--create-symbol-regex
+		       symbol-name)))
+    (list symbol-regex
+	  (list 1 'font-lock-keyword-face nil t)
+	  (list 2 'font-lock-function-name-face nil t))))
+
+(cl-defun generate--activate-font-lock-keywords (&optional (symbols generate--SYMBOL-TO-HIGHLIGHT))
+  "Activate font-lock keywords for some of generate's SYMBOLS."
+  (let* ((generate-font-lock-keywords (mapcar #'generate--font-lock-keyword-creator symbols)))
+    (font-lock-add-keywords
+     nil
+     generate-font-lock-keywords)))
 
 (add-hook 'emacs-lisp-mode-hook #'generate--activate-font-lock-keywords)
 
@@ -358,13 +386,25 @@ If NUM-RUNS is not specified, your test will be defined 100 times.
   "Returns a closure that returns the value of ATTRIBUTE from CONSTANT for OUTCOME."
   (lambda (outcome)
     (:documentation (format "Returns the value of %s for OUTCOME." attribute))
-    (funcall (-compose (apply-partially #'generate--plist-get attribute) (-rpartial #'generate--plist-get constant)) outcome)))
+    (funcall (-compose (apply-partially #'generate--plist-get attribute)
+		       (-rpartial #'generate--plist-get constant))
+	     outcome)))
 
-(defalias 'generate--get-ert-outcome-summary-message-function (generate--get-ert-outcome-attribute generate--DEFAULT-OUTCOMES-PLIST :summary-message))
-(defalias 'generate--get-ert-outcome-breakdown-message (generate--get-ert-outcome-attribute generate--DEFAULT-OUTCOMES-PLIST :breakdown-message))
-(defalias 'generate--get-ert-outcome-slot-func (generate--get-ert-outcome-attribute generate--DEFAULT-OUTCOMES-PLIST :slot))
-(defalias 'generate--get-expected-result-type (generate--get-ert-outcome-attribute generate--DEFAULT-OUTCOMES-PLIST :expected-result-type))
-(defalias 'generate--get-compatible-outcome (generate--get-ert-outcome-attribute generate--DEFAULT-OUTCOMES-PLIST :compatible))
+(defalias 'generate--get-ert-outcome-summary-message-function (generate--get-ert-outcome-attribute
+							       generate--DEFAULT-OUTCOMES-PLIST
+							       :summary-message))
+(defalias 'generate--get-ert-outcome-breakdown-message (generate--get-ert-outcome-attribute
+							generate--DEFAULT-OUTCOMES-PLIST
+							:breakdown-message))
+(defalias 'generate--get-ert-outcome-slot-func (generate--get-ert-outcome-attribute
+						generate--DEFAULT-OUTCOMES-PLIST
+						:slot))
+(defalias 'generate--get-expected-result-type (generate--get-ert-outcome-attribute
+					       generate--DEFAULT-OUTCOMES-PLIST
+					       :expected-result-type))
+(defalias 'generate--get-compatible-outcome (generate--get-ert-outcome-attribute
+					     generate--DEFAULT-OUTCOMES-PLIST
+					     :compatible))
 
 (defun generate--get-group-name-and-index-for-test-base (test-identifier)
   "Uses TEST-IDENTIFIER to get the name and index of a given TEST."
@@ -372,15 +412,18 @@ If NUM-RUNS is not specified, your test will be defined 100 times.
     "Returns the name and index of a given TEST."
     (let* ((test-name (symbol-name (ert-test-name test)))
 	   (name-end-index (1- (s-index-of test-identifier test-name)))
-	   (test-number-start-index (+ name-end-index (length test-identifier) 2))
+	   (test-number-start-index (+ name-end-index
+				       (length test-identifier) 2))
 	   (name (substring test-name 0 name-end-index))
 	   (test-number (substring test-name test-number-start-index)))
       (cons name (string-to-number test-number)))))
 
-(defalias 'generate--get-group-name-and-index-for-test (generate--get-group-name-and-index-for-test-base generate--TEST-IDENTIFIER)
+(defalias 'generate--get-group-name-and-index-for-test (generate--get-group-name-and-index-for-test-base
+							generate--TEST-IDENTIFIER)
   "Default implementation of generate--get-group-name-and-index-for-test.")
 
-(defalias 'generate--get-group-name-and-index-for-each-test (apply-partially #'mapcar #'generate--get-group-name-and-index-for-test)  "Converts of a list of TEST-IDENTIFIERS into a list of test group symbols.
+(defalias 'generate--get-group-name-and-index-for-each-test (apply-partially #'mapcar #'generate--get-group-name-and-index-for-test)
+  "Converts of a list of TEST-IDENTIFIERS into a list of test group symbols.
 
 \(fn LIST)")
 
@@ -428,8 +471,13 @@ if the OUTCOME is not exclusive or the OUTCOME is exclusive
 and the exclusivity requirement was met."
   (thunk-let* ((outcome-value (generate--plist-get outcome test-group-plist))
 	       (other-outcomes (-remove (apply-partially #'equal outcome) list-of-outcomes))
-	       (other-outcome-values (mapcar (lambda (other-outcome) (generate--plist-get other-outcome test-group-plist)) other-outcomes))
-	       (exclusive-check (if exclusivep (seq-every-p (apply-partially #'equal 0) other-outcome-values) t)))
+	       (other-outcome-values (mapcar (lambda (other-outcome)
+					       (generate--plist-get other-outcome test-group-plist))
+					     other-outcomes))
+	       (exclusive-check (if exclusivep (seq-every-p
+						(apply-partially #'equal 0)
+						other-outcome-values)
+				  t)))
     (and (g--gt0 outcome-value) exclusive-check)))
 
 
@@ -439,7 +487,11 @@ When EXCLUSIVEP is t, a given test will be only be counted for OUTCOME
 if every single one of its results matches OUTCOME.
 In other words, for a given test, none of the other outcomes in LIST-OF-OUTCOMES
 can have a value greater than zero for a given test-group, if EXCLUSIVEP is t."
-  (let ((result (map-filter (apply-partially #'generate--creates-stats-predicate list-of-outcomes outcome exclusivep) tests-groups-alist)))
+  (let ((result (map-filter (apply-partially #'generate--creates-stats-predicate
+					     list-of-outcomes
+					     outcome
+					     exclusivep)
+			    tests-groups-alist)))
     (cons outcome (length result))))
 
 (defalias 'generate--stats (apply-partially #'generate--stats-default generate--DEFAULT-OUTCOMES) "Default implementation of `generate--stats-default'.
@@ -450,23 +502,28 @@ if every single one of its results matches OUTCOME.
 
 \(fn ERT-OUTCOME EXCLUSIVEP TESTS-GROUPS-ALIST)")
 
-(defalias 'generate--stats-passed-expected (apply-partially #'generate--stats :passed-expected t) "Returns a con cell with the count of test-groups that passed as expected.
+(defalias 'generate--stats-passed-expected (apply-partially #'generate--stats :passed-expected t)
+  "Returns a con cell with the count of test-groups that passed as expected.
 
 \(fn TESTS-GROUPS-ALIST)")
 
-(defalias 'generate--stats-failed-expected (apply-partially #'generate--stats :failed-expected t) "Returns a con cell with the count of test-groups that failed as expected.
+(defalias 'generate--stats-failed-expected (apply-partially #'generate--stats :failed-expected t)
+  "Returns a con cell with the count of test-groups that failed as expected.
 
 \(fn TESTS-GROUPS-ALIST)")
 
-(defalias 'generate--stats-skipped (apply-partially #'generate--stats :skipped t) "Returns a con cell with the count of test-groups that were skipped.
+(defalias 'generate--stats-skipped (apply-partially #'generate--stats :skipped t)
+  "Returns a con cell with the count of test-groups that were skipped.
 
 \(fn TESTS-GROUPS-ALIST)")
 
-(defalias 'generate--stats-failed-unexpected (apply-partially #'generate--stats :failed-unexpected nil) "Returns a con cell with the count of test-groups that failed unexpectedly.
+(defalias 'generate--stats-failed-unexpected (apply-partially #'generate--stats :failed-unexpected nil)
+  "Returns a con cell with the count of test-groups that failed unexpectedly.
 
 \(fn TESTS-GROUPS-ALIST)")
 
-(defalias 'generate--stats-passed-unexpected (apply-partially #'generate--stats :passed-unexpected nil) "Returns a con cell with the count of test-groups that passed unexpectedly.
+(defalias 'generate--stats-passed-unexpected (apply-partially #'generate--stats :passed-unexpected nil)
+  "Returns a con cell with the count of test-groups that passed unexpectedly.
 
 \(fn TESTS-GROUPS-ALIST)")
 
@@ -479,17 +536,49 @@ if every single one of its results matches OUTCOME.
 
 \(fn TESTS-GROUPS-ALIST)")
 
-(defsubst generate--print-unexpected-outcome-message-for-test-group (default-outcomes-plist test-outcome test-group-stats test-name total-tests duration)
+(defsubst generate--print-unexpected-outcome-message-for-test-group (default-outcomes-plist
+								     test-outcome
+								     test-group-stats
+								     test-name
+								     total-tests
+								     duration)
   (-let* ((sign (generate--plist-get :test-outcome-sign (generate--plist-get test-outcome default-outcomes-plist)))
 	  (expected-outcome (generate--plist-get :compatible (generate--plist-get test-outcome default-outcomes-plist)))
 	  (expected-outcome-count (generate--plist-get expected-outcome test-group-stats)))
-    (generate--print-expected-outcome-message-for-test-group default-outcomes-plist expected-outcome test-name expected-outcome-count total-tests duration sign)))
+    (generate--print-expected-outcome-message-for-test-group
+     default-outcomes-plist
+     expected-outcome
+     test-name
+     expected-outcome-count
+     total-tests
+     duration
+     sign)))
 
-(cl-defsubst generate--print-expected-outcome-message-for-test-group (default-outcomes-plist test-outcome test-name outcome-count total-tests duration &optional sign)
-  (let* ((outcome-attributes (generate--plist-get test-outcome default-outcomes-plist))
-	 (outcome-string (funcall (generate--plist-get :summary-message outcome-attributes) outcome-count))
-	 (outcome-sign (or sign (generate--plist-get :test-outcome-sign outcome-attributes))))
-    (message "%s %s > %s/%s %s %s (%f sec)" outcome-sign test-name outcome-count total-tests (if (> outcome-count 1) "tests" "test") outcome-string duration)))
+(cl-defsubst generate--print-expected-outcome-message-for-test-group (default-outcomes-plist
+								      test-outcome
+								      test-name
+								      outcome-count
+								      total-tests
+								      duration
+								      &optional sign)
+  (let* ((outcome-attributes (generate--plist-get
+			      test-outcome
+			      default-outcomes-plist))
+	 (outcome-string (funcall (generate--plist-get
+				   :summary-message
+				   outcome-attributes)
+				  outcome-count))
+	 (outcome-sign (or sign (generate--plist-get
+				 :test-outcome-sign
+				 outcome-attributes))))
+    (message "%s %s > %s/%s %s %s (%f sec)"
+	     outcome-sign
+	     test-name
+	     outcome-count
+	     total-tests
+	     (if (> outcome-count 1) "tests" "test")
+	     outcome-string
+	     duration)))
 
 (defun generate--print-final-test-group-stats-base (default-outcomes-plist)
   (lambda (test-group-stats test-name)
@@ -992,7 +1081,7 @@ Also returns the list of numbers used to create those predicates.")
 (defalias 'generate--seq-map-applify-vector (apply-partially #'seq-map (-applify #'vector)))
 
 (defalias 'generate--seq-max-plus-one (-compose #'1+ #'seq-max))
-(defalias 'generate--seq-max-plus-1-and-random-chunk-length (-juxt #'generate--seq-max-plus-one  #'generate--seq-random-chunk-length))
+(defalias 'generate--seq-max-plus-1-and-random-chunk-length (-juxt #'generate--seq-max-plus-one  #'generate-seq-random-chunk-length))
 
 (defalias 'generate--seq-every-p-nat-number (apply-partially #'seq-every-p #'natnump))
 (defalias 'generate--seq-every-p-float (apply-partially #'seq-every-p #'floatp))
@@ -1069,7 +1158,7 @@ and FUNCTION is not called."
 
 \(fn SEQ)")
 
-(defun generate--seq-random-chunk-length (seq)
+(defun generate-seq-random-chunk-length (seq)
   "Returns a random chunk length for SEQ.
 The value is guaranteed to be greater than
 or equal to 1 and less than the length of SEQ."
@@ -1087,7 +1176,7 @@ or equal to 1 and less than the length of SEQ."
 
 \(fn (CHUNK-LENGTH SEQ))")
 
-(defalias 'generate-seq-random-chunk (-compose #'generate--applify-seq-random-chunk-of-size-n (-juxt #'generate--seq-random-chunk-length #'identity)) "Returns a random chunk of from SEQ.
+(defalias 'generate-seq-random-chunk (-compose #'generate--applify-seq-random-chunk-of-size-n (-juxt #'generate-seq-random-chunk-length #'identity)) "Returns a random chunk of from SEQ.
 
 The length of chunk will be greater than or equal to 1
 and less than the length of SEQ.
@@ -1098,7 +1187,7 @@ and less than the length of SEQ.
 
 \(fn SEQ)")
 
-(defalias 'generate-seq-split-random (-compose #'generate--applify-seq-split (-juxt #'identity #'generate--seq-random-chunk-length)) "Splits a SEQ into random chunks of random size.
+(defalias 'generate-seq-split-random (-compose #'generate--applify-seq-split (-juxt #'identity #'generate-seq-random-chunk-length)) "Splits a SEQ into random chunks of random size.
 
 \(fn SEQ)")
 
@@ -1106,9 +1195,11 @@ and less than the length of SEQ.
   "Returns N random values from SEQ."
   (funcall (-compose (-rpartial #'seq-take n) #'generate-seq-shuffle) seq))
 
+(defalias 'generate-seq-take-n-random-values 'generate-seq-n-random-values)
+
 (defun generate-seq-random-values (seq)
   "Returns a random number of values from SEQ."
-  (funcall (-compose (-rpartial #'generate-seq-n-random-values seq) #'generate--seq-random-chunk-length) seq))
+  (funcall (-compose (-rpartial #'generate-seq-n-random-values seq) #'generate-seq-random-chunk-length) seq))
 
 (cl-defgeneric generate--seq-random-iterate-from-max (seq)
   "Creates a new sequence starting from the max of SEQ.
@@ -1223,7 +1314,7 @@ Each chunk will be LENGTH long."
 
 (defun generate-seq-n-random-chunks-of-random-size (n seq)
   "Returns N random chunks from SEQ."
-  (funcall (-compose (-rpartial #'generate-seq-n-random-chunks-of-size-x n seq) #'generate--seq-random-chunk-length) seq))
+  (funcall (-compose (-rpartial #'generate-seq-n-random-chunks-of-size-x n seq) #'generate-seq-random-chunk-length) seq))
 
 (defalias 'generate--applify-seq-n-random-chunks-of-random-size (-applify #'generate-seq-n-random-chunks-of-random-size))
 
@@ -1260,6 +1351,15 @@ Finally, apply OP to MAP."
   (if (length= list-of-plists 1)
       (car list-of-plists)
     (apply (apply-partially #'map-merge-with 'plist #'+) list-of-plists)))
+
+;; list-of-n -> random-list-of
+(generate--defun-random-with-one-arg! generate-map-list-of-n-keys (count map)
+  "Returns a list of COUNT random keys from MAP.
+\(fn)
+\\Returns a list of random keys from MAP.
+
+\(fn)"
+  (generate-seq-n-random-values count (map-keys map)))
 
 (cl-defun generate-data (&key (item-transformer #'identity) (list-transformer #'generate-shuffle-list)
 			      min-length max-length exact-length)
@@ -1662,7 +1762,7 @@ It will be used to create the range of times from
 which the timestamp will be selected.
 Each timestamp will be in the
 \(TICKS . HZ) format."
-  (generate--lisp-timestamp-helper (floor range-size 2) (floor range-size 2)))
+  (generate--lisp-timestamp-helper range-size 0))
 
 (cl-defun generate-random-lisp-timestamp-range (&optional (range-size generate-lisp-timestamp-range-size))
   "Returns a random Lisp timestamp range.
@@ -1849,13 +1949,25 @@ All alphabetic characters will be in lowercase.")
 (defalias 'generate-random-string-of-upper-alphanums (apply-partially #'generate--random-identifier-string #'generate--get-next-upper-alpha-string) "Create a random alphanumeric identifier string.
 All alphabetic characters will be uppercase.")
 
-(defmacro generate-with-buffer-with-text (buffer-text &rest body)
-  "Run BODY in a temporary buffer with holding BUFFER-TEXT."
+(defmacro generate-with-buffer-with-text (text &rest body)
+  "Run BODY in a temporary buffer with holding TEXT.
+If the string \"<point>\" appears in TEXT then remove it
+and place the point there before running BODY, otherwise
+place the point at the beginning of the inserted text.
+Shamelessly stolen from org-test.el."
   (declare (indent 1) (debug t))
-  `(with-temp-buffer
-     (insert ,buffer-text)
-     (goto-char (point-min))
-     ,@body))
+  (cl-with-gensyms (inside-text)
+    `(let ((,inside-text (if (stringp ,text) ,text (eval ,text))))
+       (with-temp-buffer
+         (let ((point (string-match "<point>" ,inside-text)))
+           (if point
+               (progn
+                 (insert (replace-match "" nil nil ,inside-text))
+                 (goto-char (1+ (match-beginning 0))))
+             (insert ,inside-text)
+             (goto-char (point-min))))
+         (font-lock-ensure (point-min) (point-max))
+         ,@body))))
 
 (defalias 'generate--basic-tbl (-rpartial #'orgtbl-to-orgtbl '()))
 (defalias 'generate--join-with-new-lines (apply-partially #'s-join "\n"))
@@ -2029,17 +2141,17 @@ will return."
 						"\n"
 						"\(fn N [WITH-TIME])")))
 	    (,single-string-docstring (s-join "\n" (list ,docstring-line-one
-					      ,docstring-line-two
-					      ,docstring-line-three
-					      "\n"
-					      "\(fn [WITH-TIME])"))))
+							 ,docstring-line-two
+							 ,docstring-line-three
+							 "\n"
+							 "\(fn [WITH-TIME])"))))
        (if ,listp
 	   (cl-function (lambda (,count &optional ,with-time (,order 'random))
 			  (:documentation ,list-docstring)
 			  (mapcar
 			   (lambda (,timestamp) (funcall ,transformer ,timestamp ,with-time ,inactive))
 			   (generate-list-of-n-lisp-timestamps ,count :order ,order))))
-	  (lambda (&optional ,with-time)
+	 (lambda (&optional ,with-time)
 	   (:documentation ,single-string-docstring)
 	   (funcall
 	    ,transformer
@@ -2154,6 +2266,73 @@ note."
 (defalias 'generate-block-of-n-org-state-change-notes (-compose (-partial #'s-join "\n") #'generate-list-of-n-org-state-change-notes) "Returns a block of text with N org state change notes.")
 
 (defalias 'generate-random-block-of-org-state-change-notes (generate-default-convert-n-gen-to-random #'generate-block-of-n-org-state-change-notes) "Returns a random block of org state change notes.")
+
+(defalias 'generate-random-org-headline-level (-partial #'generate-random-nat-number-in-range (list 1 15))
+  "Returns a random org headline level.
+This is a convenience alias.
+
+\(fn)")
+
+(cl-defun generate--process-src-block-parameter ((key . value))
+  (cl-flet* ((create-src-block-parameter-key (k)
+	       (concat ":" (prin1-to-string k)))
+	     (handle-list-of-values ()
+	       (->> value
+		    (car)
+		    (generate-seq-take-random-value-from-seq)
+		    (cons key)
+		    (generate--process-src-block-parameter)))
+	     (handle-results-param ()
+	       (let ((k (create-src-block-parameter-key key)))
+		 (->> value
+		      (generate-seq-random-values)
+		      (mapcar (-compose #'prin1-to-string #'generate-seq-take-random-value-from-seq))
+		      (s-join " ")
+		      (cons k)))))
+    (cond
+     ((or (equal key 'noeval)
+	  (equal key 'no-expand)
+	  (equal value nil))
+      (cons (create-src-block-parameter-key key) nil))
+     ((equal key 'results) (handle-results-param))
+     ((proper-list-p value) (handle-list-of-values))
+     ((equal :any value) (cons (create-src-block-parameter-key
+				key)
+			       (generate-random-word)))
+     (t (cons (create-src-block-parameter-key key)
+	      (prin1-to-string value))))))
+
+(generate--defun-mv! generate-string-with-x-src-block-parameters-mv (count)
+  "Creates a string with COUNT org-src-block parameters.
+Returns a list where the car is the requested string of parameters
+and the is a list  where each con is one of the key-values pairs
+in the requested string.
+
+\(fn COUNT)
+\\Returns a string with COUNT org-src-block parameters.
+
+\(fn)"
+  (let* ((keys (generate-seq-n-random-values
+		count
+		org-babel-common-header-args-w-values))
+	 (key-value-pairs (mapcar #'generate--process-src-block-parameter
+				  keys))
+	 (string-of-params (->> key-value-pairs
+				(flatten-tree)
+				(s-join " "))))
+    (list string-of-params key-value-pairs)))
+
+(generate--defalias-mv! generate-random-string-of-src-block-parameters-mv
+    (generate-default-convert-n-gen-to-random
+     #'generate-string-with-x-src-block-parameters-mv)
+  "Returns a string with src-block parameters.
+
+\(fn)
+\\Returns a string with src-block parameters and
+a list that contains the corresponding parameters.
+
+\(fn)
+")
 
 (defun generate--random-void-x-error (symbol)
   "Returns a closure that will generate a random void type error.
@@ -2469,6 +2648,20 @@ Values are hexadecimals."
 
 (defalias 'generate-random-list-of-colors (generate-default-convert-n-gen-to-random #'generate-list-of-n-colors))
 
+(defconst org-x--TEST-LANGS
+  (list
+   'typescript
+   'javascript
+   'json
+   'python
+   'c
+   'rust
+   'haskell))
+
+(defalias 'generate-random-language-symbol (-partial #'generate-seq-take-random-value-from-seq org-x--TEST-LANGS))
+
+(defalias 'generate-random-language-name (-compose #'symbol-name #'generate-random-language-symbol))
+
 (defconst generate--NUMBER-GENS
   (vector
    #'generate-random-float-between-0-and-1
@@ -2550,8 +2743,13 @@ When the resulting function is called,
 generate-call-random-function
 will select a function from GENERATORS-LIST."
   (let* ((alias-name (format "generate-random-%s" type))
-	 (docstring (format "Returns a random %s." type))
-	 (alias (format "(defalias '%s (apply-partially #'generate-call-random-function %s) \"%s\")" alias-name generators-list docstring)))
+	 (docstring (format "Returns a random %s.\n\n\\(fn)" type))
+	 (def (format "(apply-partially #'generate-call-random-function %s)"
+		      generators-list))
+	 (alias (format "(defalias '%s \n %s \n \"%s\")"
+			alias-name
+			def
+			docstring)))
     (list alias-name alias)))
 
 (defun generate--create-list-of-n-xs (type generators-list)
@@ -2563,8 +2761,12 @@ will select a function from GENERATORS-LIST."
 	 (docstring-line-one (format "Returns a random list of %s." type))
 	 (docstring-line-two (format "The list will have N %ss." type))
 	 (docstring (s-join "\n" (list docstring-line-one docstring-line-two "\n" "\\(fn N)")))
-	 (alias (format "(defalias '%s (-rpartial #'generate-call-random-function-n-times %s) \"%s\")"
-			alias-name generators-list docstring)))
+	 (def (format "(-rpartial #'generate-call-random-function-n-times %s)"
+		      generators-list))
+	 (alias (format "(defalias '%s \n %s \n \"%s\")"
+			alias-name
+			def
+			docstring)))
     (list alias-name alias)))
 
 (defun generate--create-generate-random-x-type-twice (type generators-list)
@@ -2574,9 +2776,13 @@ generate-call-random-function-n-times
 will select a function from GENERATORS-LIST.
 The selected function will be called twice."
   (let* ((alias-name (format "generate-random-%s-type-twice" type))
-	 (docstring (format "Returns two random %ss." type))
-	 (alias (format "(defalias '%s (apply-partially #'generate-call-random-function-n-times 2 %s) \"%s\")"
-			alias-name generators-list docstring)))
+	 (docstring (format "Returns two random %ss.\n\n\\(fn)" type))
+	 (def (format "(apply-partially #'generate-call-random-function-n-times 2 %s)"
+		      generators-list))
+	 (alias (format "(defalias '%s \n %s \n \"%s\")"
+			alias-name
+			def
+			docstring)))
     (list alias-name alias)))
 
 (defun generate--create-random-list-of-xs (type generators-list)
@@ -2587,32 +2793,63 @@ will select a function from GENERATORS-LIST.
 The selected function will be
 called a random amount of times."
   (let* ((alias-name (format "generate-random-list-of-%ss" type))
-	 (docstring (format "Returns a random list of %ss." type))
-	 (alias (format "(defalias '%s (apply-partially #'generate-call-random-function-random-times %s) \"%s\")"
-			alias-name generators-list docstring)))
+	 (docstring (format "Returns a random list of %ss.\n\n\\(fn)" type))
+	 (def (format "(apply-partially #'generate-call-random-function-random-times %s)"
+		      generators-list))
+	 (alias (format
+		 "(defalias '%s \n %s \n \"%s\")"
+		 alias-name
+		 def
+		 docstring)))
     (list alias-name alias)))
 
-(defconst generate-COMPOSITE-GENERATORS-GENERATORS
+(defconst generate--COMPOSITE-GENERATORS-GENERATORS
   (list
    #'generate--create-generate-random-x
    #'generate--create-list-of-n-xs
    #'generate--create-generate-random-x-type-twice
    #'generate--create-random-list-of-xs))
 
-(defun generate--generate-composite-generators-tree-for-type-x (subheading-stars src-block-start src-block-end type gens)
-  (lambda (alias-creator)
-    (-let (((alias-name alias) (funcall alias-creator type gens)))
-      (concat subheading-stars " " alias-name  "\n" src-block-start "\n" alias "\n" src-block-end))))
+(defun generate--indent-elisp-code (code)
+  (with-temp-buffer
+    (emacs-lisp-mode)
+    (insert code)
+    (indent-region (point-min) (point))
+    (buffer-substring-no-properties (point-min) (point))))
 
-(defun generate--generate-composite-generators-for-type-x (function-creators top-level-stars subheading-stars src-block-start src-block-end)
+(defun generate--composite-generators-tree-for-type-x (subheading-stars
+						       src-block-start
+						       src-block-end
+						       type
+						       gens)
+  (lambda (alias-creator)
+    (-let* (((alias-name alias) (funcall alias-creator type gens))
+	   (formatted-alias (generate--indent-elisp-code alias)))
+      (concat subheading-stars " "
+	      alias-name  "\n"
+	      src-block-start "\n"
+	      formatted-alias "\n"
+	      src-block-end))))
+
+(defun generate--composite-generators-for-type-x (function-creators
+						  top-level-stars
+						  subheading-stars
+						  src-block-start
+						  src-block-end)
   "Returns a function that will create a list of functions.
 Each function in FUNCTION-CREATORS should be a list of functions."
   (lambda (type gens)
-    (let ((funcs-list (mapconcat (generate--generate-composite-generators-tree-for-type-x subheading-stars src-block-start src-block-end type gens) function-creators "\n"))
+    (let ((funcs-list (mapconcat (generate--composite-generators-tree-for-type-x
+				  subheading-stars
+				  src-block-start
+				  src-block-end
+				  type
+				  gens)
+				 function-creators "\n"))
 	  (top-level-heading (concat top-level-stars " " type "s" " ")))
       (concat top-level-heading "\n" funcs-list))))
 
-(defun generate--generate-composite-generators-base (function-creators type-generator-mapping heading-level)
+(defun generate--composite-generators-base (function-creators type-generator-mapping heading-level)
   "Returns a function that will add functions to a buffer.
 FUNCTION-CREATORS should be a list of functions that
 will create composite generators.  TYPE-GENERATOR-MAPPING
@@ -2623,7 +2860,7 @@ HEADING-LEVEL should be the top level of each group."
 	   (subheading-stars (make-string (1+ heading-level) ?*))
 	   (src-block-start "#+begin_src elisp :tangle yes")
 	   (src-block-end "#+end_src")
-	   (list-of-funcs (map-apply (generate--generate-composite-generators-for-type-x
+	   (list-of-funcs (map-apply (generate--composite-generators-for-type-x
 				      function-creators
 				      top-level-stars
 				      subheading-stars
@@ -2632,103 +2869,216 @@ HEADING-LEVEL should be the top level of each group."
 				     type-generator-mapping)))
       (funcall (-compose (apply-partially #'s-join "\n\n") #'flatten-tree) list-of-funcs))))
 
-(defalias 'generate--generate-composite-generators (generate--generate-composite-generators-base generate-COMPOSITE-GENERATORS-GENERATORS generate--TYPE-GEN-MAP 3))
+(defalias 'generate--composite-generators (generate--composite-generators-base generate--COMPOSITE-GENERATORS-GENERATORS generate--TYPE-GEN-MAP 3))
 
-(defalias 'generate-random-number (apply-partially #'generate-call-random-function generate--NUMBER-GENS) "Returns a random number.")
+(defalias 'generate-random-number
+  (apply-partially #'generate-call-random-function generate--NUMBER-GENS)
+  "Returns a random number.
 
-(defalias 'generate-list-of-n-numbers (-rpartial #'generate-call-random-function-n-times generate--NUMBER-GENS) "Returns a random list of number.
+\(fn)")
+
+(defalias 'generate-list-of-n-numbers
+  (-rpartial #'generate-call-random-function-n-times generate--NUMBER-GENS)
+  "Returns a random list of number.
 The list will have N numbers.
 
 
 \(fn N)")
 
-(defalias 'generate-random-number-type-twice (apply-partially #'generate-call-random-function-n-times 2 generate--NUMBER-GENS) "Returns two random numbers.")
+(defalias 'generate-random-number-type-twice
+  (apply-partially #'generate-call-random-function-n-times 2 generate--NUMBER-GENS)
+  "Returns two random numbers.
 
-(defalias 'generate-random-list-of-numbers (apply-partially #'generate-call-random-function-random-times generate--NUMBER-GENS) "Returns a random list of numbers.")
+\(fn)")
 
-(defalias 'generate-random-list (apply-partially #'generate-call-random-function generate--LIST-GENS) "Returns a random list.")
+(defalias 'generate-random-list-of-numbers
+  (apply-partially #'generate-call-random-function-random-times generate--NUMBER-GENS)
+  "Returns a random list of numbers.
 
-(defalias 'generate-list-of-n-lists (-rpartial #'generate-call-random-function-n-times generate--LIST-GENS) "Returns a random list of list.
+
+\(fn)")
+
+(defalias 'generate-random-list
+  (apply-partially #'generate-call-random-function generate--LIST-GENS)
+  "Returns a random list.
+
+\(fn)")
+
+(defalias 'generate-list-of-n-lists
+  (-rpartial #'generate-call-random-function-n-times generate--LIST-GENS)
+  "Returns a random list of list.
 The list will have N lists.
 
 
 \(fn N)")
 
-(defalias 'generate-random-list-type-twice (apply-partially #'generate-call-random-function-n-times 2 generate--LIST-GENS) "Returns two random lists.")
+(defalias 'generate-random-list-type-twice
+  (apply-partially #'generate-call-random-function-n-times 2 generate--LIST-GENS)
+  "Returns two random lists.
 
-(defalias 'generate-random-list-of-lists (apply-partially #'generate-call-random-function-random-times generate--LIST-GENS) "Returns a random list of lists.")
+\(fn)")
 
-(defalias 'generate-random-vector (apply-partially #'generate-call-random-function generate--VECTOR-GENS) "Returns a random vector.")
+(defalias 'generate-random-list-of-lists
+  (apply-partially #'generate-call-random-function-random-times generate--LIST-GENS)
+  "Returns a random list of lists.
 
-(defalias 'generate-list-of-n-vectors (-rpartial #'generate-call-random-function-n-times generate--VECTOR-GENS) "Returns a random list of vector.
+\(fn)")
+
+(defalias 'generate-random-vector
+  (apply-partially #'generate-call-random-function generate--VECTOR-GENS)
+  "Returns a random vector.
+
+\(fn)")
+
+(defalias 'generate-list-of-n-vectors
+  (-rpartial #'generate-call-random-function-n-times generate--VECTOR-GENS)
+  "Returns a random list of vector.
 The list will have N vectors.
 
 
 \(fn N)")
 
-(defalias 'generate-random-vector-type-twice (apply-partially #'generate-call-random-function-n-times 2 generate--VECTOR-GENS) "Returns two random vectors.")
+(defalias 'generate-random-vector-type-twice
+  (apply-partially #'generate-call-random-function-n-times 2 generate--VECTOR-GENS)
+  "Returns two random vectors.
 
-(defalias 'generate-random-list-of-vectors (apply-partially #'generate-call-random-function-random-times generate--VECTOR-GENS) "Returns a random list of vectors.")
+\(fn)")
 
-(defalias 'generate-random-alist (apply-partially #'generate-call-random-function generate--ALIST-GENS) "Returns a random alist.")
+(defalias 'generate-random-list-of-vectors
+  (apply-partially #'generate-call-random-function-random-times generate--VECTOR-GENS)
+  "Returns a random list of vectors.
 
-(defalias 'generate-list-of-n-alists (-rpartial #'generate-call-random-function-n-times generate--ALIST-GENS) "Returns a random list of alist.
+\(fn)")
+
+(defalias 'generate-random-alist
+  (apply-partially #'generate-call-random-function generate--ALIST-GENS)
+  "Returns a random alist.
+
+\(fn)")
+
+(defalias 'generate-list-of-n-alists
+  (-rpartial #'generate-call-random-function-n-times generate--ALIST-GENS)
+  "Returns a random list of alist.
 The list will have N alists.
 
 
 \(fn N)")
 
-(defalias 'generate-random-alist-type-twice (apply-partially #'generate-call-random-function-n-times 2 generate--ALIST-GENS) "Returns two random alists.")
+(defalias 'generate-random-alist-type-twice
+  (apply-partially #'generate-call-random-function-n-times 2 generate--ALIST-GENS)
+  "Returns two random alists.
 
-(defalias 'generate-random-list-of-alists (apply-partially #'generate-call-random-function-random-times generate--ALIST-GENS) "Returns a random list of alists.")
+\(fn)")
 
-(defalias 'generate-random-plist (apply-partially #'generate-call-random-function generate--PLIST-GENS) "Returns a random plist.")
+(defalias 'generate-random-list-of-alists
+  (apply-partially #'generate-call-random-function-random-times generate--ALIST-GENS)
+  "Returns a random list of alists.
 
-(defalias 'generate-list-of-n-plists (-rpartial #'generate-call-random-function-n-times generate--PLIST-GENS) "Returns a random list of plist.
+\(fn)")
+
+(defalias 'generate-random-plist
+  (apply-partially #'generate-call-random-function generate--PLIST-GENS)
+  "Returns a random plist.
+
+\(fn)")
+
+(defalias 'generate-list-of-n-plists
+  (-rpartial #'generate-call-random-function-n-times generate--PLIST-GENS)
+  "Returns a random list of plist.
 The list will have N plists.
 
 
 \(fn N)")
 
-(defalias 'generate-random-plist-type-twice (apply-partially #'generate-call-random-function-n-times 2 generate--PLIST-GENS) "Returns two random plists.")
+(defalias 'generate-random-plist-type-twice
+  (apply-partially #'generate-call-random-function-n-times 2 generate--PLIST-GENS)
+  "Returns two random plists.
 
-(defalias 'generate-random-list-of-plists (apply-partially #'generate-call-random-function-random-times generate--PLIST-GENS) "Returns a random list of plists.")
+\(fn)")
 
-(defalias 'generate-random-hash-table (apply-partially #'generate-call-random-function generate--HASH-TABLE-GENS) "Returns a random hash-table.")
+(defalias 'generate-random-list-of-plists
+  (apply-partially #'generate-call-random-function-random-times generate--PLIST-GENS)
+  "Returns a random list of plists.
 
-(defalias 'generate-list-of-n-hash-tables (-rpartial #'generate-call-random-function-n-times generate--HASH-TABLE-GENS) "Returns a random list of hash-table.
+\(fn)")
+
+(defalias 'generate-random-hash-table
+  (apply-partially #'generate-call-random-function generate--HASH-TABLE-GENS)
+  "Returns a random hash-table.
+
+\(fn)")
+
+(defalias 'generate-list-of-n-hash-tables
+  (-rpartial #'generate-call-random-function-n-times generate--HASH-TABLE-GENS)
+  "Returns a random list of hash-table.
 The list will have N hash-tables.
 
 
 \(fn N)")
 
-(defalias 'generate-random-hash-table-type-twice (apply-partially #'generate-call-random-function-n-times 2 generate--HASH-TABLE-GENS) "Returns two random hash-tables.")
+(defalias 'generate-random-hash-table-type-twice
+  (apply-partially #'generate-call-random-function-n-times 2 generate--HASH-TABLE-GENS)
+  "Returns two random hash-tables.
 
-(defalias 'generate-random-list-of-hash-tables (apply-partially #'generate-call-random-function-random-times generate--HASH-TABLE-GENS) "Returns a random list of hash-tables.")
+\(fn)")
 
-(defalias 'generate-random-seq (apply-partially #'generate-call-random-function generate--SEQ-GENS) "Returns a random seq.")
+(defalias 'generate-random-list-of-hash-tables
+  (apply-partially #'generate-call-random-function-random-times generate--HASH-TABLE-GENS)
+  "Returns a random list of hash-tables.
 
-(defalias 'generate-list-of-n-seqs (-rpartial #'generate-call-random-function-n-times generate--SEQ-GENS) "Returns a random list of seq.
+\(fn)")
+
+(defalias 'generate-random-seq
+  (apply-partially #'generate-call-random-function generate--SEQ-GENS)
+  "Returns a random seq.
+
+\(fn)")
+
+(defalias 'generate-list-of-n-seqs
+  (-rpartial #'generate-call-random-function-n-times generate--SEQ-GENS)
+  "Returns a random list of seq.
 The list will have N seqs.
 
 
 \(fn N)")
 
-(defalias 'generate-random-seq-type-twice (apply-partially #'generate-call-random-function-n-times 2 generate--SEQ-GENS) "Returns two random seqs.")
+(defalias 'generate-random-seq-type-twice
+  (apply-partially #'generate-call-random-function-n-times 2 generate--SEQ-GENS)
+  "Returns two random seqs.
 
-(defalias 'generate-random-list-of-seqs (apply-partially #'generate-call-random-function-random-times generate--SEQ-GENS) "Returns a random list of seqs.")
+\(fn)")
 
-(defalias 'generate-random-map (apply-partially #'generate-call-random-function generate--MAP-GENS) "Returns a random map.")
+(defalias 'generate-random-list-of-seqs
+  (apply-partially #'generate-call-random-function-random-times generate--SEQ-GENS)
+  "Returns a random list of seqs.
 
-(defalias 'generate-list-of-n-maps (-rpartial #'generate-call-random-function-n-times generate--MAP-GENS) "Returns a random list of map.
+\(fn)")
+
+(defalias 'generate-random-map
+  (apply-partially #'generate-call-random-function generate--MAP-GENS)
+  "Returns a random map.
+
+\(fn)")
+
+(defalias 'generate-list-of-n-maps
+  (-rpartial #'generate-call-random-function-n-times generate--MAP-GENS)
+  "Returns a random list of map.
 The list will have N maps.
 
 
 \(fn N)")
 
-(defalias 'generate-random-map-type-twice (apply-partially #'generate-call-random-function-n-times 2 generate--MAP-GENS) "Returns two random maps.")
+(defalias 'generate-random-map-type-twice
+  (apply-partially #'generate-call-random-function-n-times 2 generate--MAP-GENS)
+  "Returns two random maps.
 
-(defalias 'generate-random-list-of-maps (apply-partially #'generate-call-random-function-random-times generate--MAP-GENS) "Returns a random list of maps.")
+\(fn)")
+
+(defalias 'generate-random-list-of-maps
+  (apply-partially #'generate-call-random-function-random-times generate--MAP-GENS)
+  "Returns a random list of maps.
+
+\(fn)")
 
 (defalias 'generate-random-value (-partial #'generate-call-random-function generate--ALL-GENS) "Returns a random value.")
 
