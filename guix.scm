@@ -13,9 +13,9 @@
 (define-public generate
   (package
     (name "generate")
-    (version "0.0.0")
+    (version "0.0.4")
     (source (local-file (getcwd) #:recursive? #t))
-    (build-system emacs-build-system)  
+    (build-system emacs-build-system)
     (inputs (list emacs-dash emacs-s emacs-compat))
     (native-inputs (list git))
     (synopsis "Random generation for Emacs Lisp")
@@ -25,4 +25,3 @@
 
 generate
 ;;; guix.scm ends here
-
