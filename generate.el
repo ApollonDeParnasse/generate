@@ -360,7 +360,8 @@ If NUM-RUNS is not specified, your test will be defined 100 times.
 	"generate-with-buffer-with-text"
 	"generate-with-buffer-with-org-table-without-hlines"
 	"generate-with-buffer-with-org-table-with-hlines"
-	"generate-with-buffer-with-org-table"))
+	"generate-with-buffer-with-org-table"
+	"generate-with-buffer-with-random-org-table"))
 
 (defun generate--create-symbol-regex (symbol-name)
   (format "(\\(\\<%s\\)\\>\\s *\\(\\(?:\\sw\\|\\s_\\)+\\)?"
@@ -924,11 +925,13 @@ Each number will be that are greater than or equal to MIN less than MAX.
 
 (defalias 'generate--random-nat-number-in-range-1-to-5 (apply-partially #'generate-random-nat-number-in-range generate--FIVERANGE) "Returns a random number that is greater than or equal to 1 and less than 5.")
 
-(defalias 'generate--random-nat-number-in-range-10 (apply-partially #'generate-random-nat-number-in-range generate--TENRANGE) "Returns a random number that is greater than or equal to 1 and less than 10.")
+(defalias 'generate-random-nat-number-in-range-10 (apply-partially #'generate-random-nat-number-in-range generate--TENRANGE)
+  "Returns a random number that is greater than or equal to 1 and less than 10.")
 
-(defalias 'generate--random-nat-number-in-range-0-10 (apply-partially #'generate-random-nat-number-in-range generate--ZEROTENRANGE) "Returns a random number that is greater than or equal to 0 and less than 10.")
+(defalias 'generate--random-nat-number-in-range-0-10 (apply-partially #'generate-random-nat-number-in-range generate--ZEROTENRANGE)
+  "Returns a random number that is greater than or equal to 0 and less than 10.")
 
-(defalias 'generate--two-random-nat-numbers-in-range-10 (lambda () (generate--times-no-args-twice #'generate--random-nat-number-in-range-10)))
+(defalias 'generate-two-random-nat-numbers-in-range-10 (lambda () (generate--times-no-args-twice #'generate-random-nat-number-in-range-10)))
 
 (defalias 'generate--random-nat-number-in-range-25 (apply-partially #'generate-random-nat-number-in-range generate--ONETOTWENTYFIVE) "Returns a random number that is greater than or equal to 1 and less than 25.")
 
@@ -954,11 +957,11 @@ Each number will be that are greater than or equal to MIN less than MAX.
 
 (defalias 'generate--random-nat-number-in-range-1-to-25 (apply-partially #'generate-random-nat-number-in-range generate--ONETOTWENTYFIVE) "Returns a random number that is greater than or equal to 1 and less than 25.")
 
-(defalias 'generate--random-nat-number-between-0-and (-compose #'generate-random-nat-number-in-range (apply-partially #'list 0)) "Returns a random number that is greater than or equal to 0 and less than N.
+(defalias 'generate-random-nat-number-between-0-and (-compose #'generate-random-nat-number-in-range (apply-partially #'list 0)) "Returns a random number that is greater than or equal to 0 and less than N.
 
 \(fn INTEGER)")
 
-(defalias 'generate--random-nat-number-between-1-and (-compose #'generate-random-nat-number-in-range (apply-partially #'list 1)) "Returns a random number that is greater than or equal to 1 and less than N.
+(defalias 'generate-random-nat-number-between-1-and (-compose #'generate-random-nat-number-in-range (apply-partially #'list 1)) "Returns a random number that is greater than or equal to 1 and less than N.
 
 \(fn INTEGER)")
 
@@ -976,7 +979,7 @@ Each number will be that are greater than or equal to MIN less than MAX.
   "Call a FUNC a random amount of times.
 
 \(fn FUNCTION)"
-  (generate--times-no-args (generate--random-nat-number-in-range-10) func))
+  (generate--times-no-args (generate-random-nat-number-in-range-10) func))
 
 (defalias 'generate-call-each-function-random-times (apply-partially #'mapcar #'generate-call-function-random-times) "Call each FUNC in LIST a random amount of times.
 The results will be collected into a list.
@@ -1163,7 +1166,7 @@ and FUNCTION is not called."
 The value is guaranteed to be greater than
 or equal to 1 and less than the length of SEQ."
   (let ((max-length (max 1 (floor (seq-length seq) 2))))
-    (if (equal max-length 1) 1 (generate--random-nat-number-between-1-and max-length))))
+    (if (equal max-length 1) 1 (generate-random-nat-number-between-1-and max-length))))
 
 (defun generate-seq-random-chunk-of-size-n (chunk-length seq)
   "Returns a random chunk of size CHUNK-LENGTH from SEQ."
@@ -1183,7 +1186,7 @@ and less than the length of SEQ.
 
 \(fn SEQ)")
 
-(defalias 'generate-seq-random-position (-compose #'generate--random-nat-number-between-0-and #'seq-length) "Returns a random position from SEQ.
+(defalias 'generate-seq-random-position (-compose #'generate-random-nat-number-between-0-and #'seq-length) "Returns a random position from SEQ.
 
 \(fn SEQ)")
 
@@ -1689,7 +1692,7 @@ The cdr will b a vector.")
 
 (defalias 'generate--random-nat-number-between-zero-and-60 (apply-partially #'generate-random-nat-number-in-range generate--ZEROTOSIXTY) "Returns a random number that is greater than or equal to 0 and less than 60.")
 
-(defalias 'generate--random-nat-number-between-1-and-13 (apply-partially #'generate-random-nat-number-in-range generate--ONETOTHIRTEEN) "Returns a random number that is greater than or equal to 1 and less than 13.")
+(defalias 'generate-random-nat-number-between-1-and-13 (apply-partially #'generate-random-nat-number-in-range generate--ONETOTHIRTEEN) "Returns a random number that is greater than or equal to 1 and less than 13.")
 
 (defalias 'generate--random-nat-number-between-zero-and-24 (apply-partially #'generate-random-nat-number-in-range generate--ZEROTOTWENTYFOUR) "Returns a random number that is greater than or equal to 0 and less than 24.")
 
@@ -1733,7 +1736,7 @@ The timestamp will be in the (TICKS . HZ) format.
 MINUS-BOTTOM and PLUS-TOP can be used to widen
 or shrink the range of possible timestamps."
   (-let* (((min hz range-length) (generate--create-timestamp-range-around-current-time minus-bottom plus-top))
-	  (range-index (generate--random-nat-number-between-0-and range-length)))
+	  (range-index (generate-random-nat-number-between-0-and range-length)))
     (generate--timestamp-range-index-to-timestamp hz min range-index)))
 
 (cl-defun generate--lisp-timestamp-range-helper (minus-bottom PLUS-TOP)
@@ -1747,7 +1750,7 @@ or shrink the range of possible timestamps."
 
 (defun generate-random-12-hour-time-string ()
   "Returns a random time string in 12-hour format."
-  (format "%s:%s" (generate--random-nat-number-between-1-and-13) (generate--number-to-padded-string (generate--random-nat-number-between-zero-and-60))))
+  (format "%s:%s" (generate-random-nat-number-between-1-and-13) (generate--number-to-padded-string (generate--random-nat-number-between-zero-and-60))))
 
 (defun generate-random-24-hour-time-string ()
   "Returns a random time string in 24-hour format."
@@ -1814,7 +1817,7 @@ of the list.  The value of order should be `asc',
 
 (defalias 'generate--list-of-n-unzipped-starts-ends-durations (-compose #'-unzip-lists (apply-partially #'mapcar #'generate--lisp-timestamp-range-duration-helper) #'generate-list-of-n-lisp-timestamp-ranges))
 
-(defalias 'generate-random-month-number #'generate--random-nat-number-between-1-and-13 "Returns a random month number.")
+(defalias 'generate-random-month-number #'generate-random-nat-number-between-1-and-13 "Returns a random month number.")
 
 (defalias 'generate-random-year-number (apply-partially #'generate-random-nat-number-in-range generate--YEARRANGE) "Returns a random year number.")
 
@@ -1975,7 +1978,10 @@ Shamelessly stolen from org-test.el."
 (defalias 'generate--join-table-cells (apply-partially #'s-join " | "))
 (defalias 'generate--interpose-hlines (apply-partially #'-interpose 'hline) "Add hlines to a list of org-table row strings.")
 
-(defalias 'generate--create-table-rows (apply-partially #'seq-map (-compose #'generate--surround-table-row #'generate--join-table-cells)) "Convert LIST into a list of strings.
+(defalias 'generate--create-table-rows
+  (apply-partially #'seq-map (-compose #'generate--surround-table-row
+				       #'generate--join-table-cells))
+  "Convert LIST into a list of strings.
 Each string is an org-table row.
 
 \(fn LIST)")
@@ -1986,9 +1992,16 @@ Each string is an org-table row.
     (funcall val-generator (list current-row current-col))))
 
 (defun generate--org-table-cell-values-helper (val-generator rows columns)
-  (funcall (-compose (apply-partially #'-partition columns) (-rpartial #'generate--times (apply-partially #'generate--org-table-val-generator-caller val-generator columns)) #'*) rows columns))
+  (funcall (-compose
+	    (apply-partially #'-partition columns)
+	    (-rpartial #'generate--times
+		       (apply-partially
+			#'generate--org-table-val-generator-caller
+			val-generator columns))
+	    #'*)
+	   rows columns))
 
-(defun generate--org-table-without-hlines (val-generator rows columns)
+(generate--defun-mv! generate-org-table-without-hlines-mv (val-generator rows columns)
   "Use ROWS, COLUMNS and VAL-GENERATOR to create an org-table.
 Rows and columns should be integers.
 VAL-GENERATOR should take one argument,
@@ -1998,11 +2011,24 @@ returns a tuple where the first value
 is the table itself and the second
 value is a list of the values
 in the table.  The returned table
-will not have hlines."
-  (-let* (((test-row-strings test-rows-as-lists) (funcall (-compose (-juxt #'generate--create-table-rows #'identity) #'generate--org-table-cell-values-helper) val-generator rows columns)))
-    (list (generate--join-with-new-lines test-row-strings) test-rows-as-lists)))
+will not have hlines.
 
-(defun generate--org-table-with-hlines (val-generator rows columns)
+\(fn VAL-GENERATOR ROWS COLUMNS)
+\\
+Use ROWS, COLUMNS and VAL-GENERATOR to create an org-table.
+Rows and columns should be integers.
+VAL-GENERATOR should take one argument,
+a list that will contain the current
+row and column number.  The returned table
+will not have hlines.
+
+\(fn VAL-GENERATOR ROWS COLUMNS)"
+  (funcall (-compose
+	    (-juxt #'generate--basic-tbl #'identity)
+	    #'generate--org-table-cell-values-helper)
+	   val-generator rows columns))
+
+(generate--defun-mv! generate-org-table-with-hlines-mv (val-generator rows columns)
   "Use ROWS, COLUMNS and VAL-GENERATOR to create an org-table.
 ROWS and COLUMNS should be integers.
 VAL-GENERATOR should take one argument,
@@ -2011,70 +2037,97 @@ and column number.  This function returns
 a tuple where the first value is the
 table itself and the second value
 is a list of the values in the table.
-The returned table will have hlines."
-  (-let* (((table-with-hlines _) (funcall (-compose (-juxt #'generate--interpose-hlines #'identity) #'generate--org-table-cell-values-helper) val-generator rows columns)))
-    (list (generate--basic-tbl table-with-hlines) table-with-hlines)))
+The returned table will have hlines.
+
+\(fn VAL-GENERATOR ROWS COLUMNS)
+\\
+Use ROWS, COLUMNS and VAL-GENERATOR to create an org-table.
+ROWS and COLUMNS should be integers.
+VAL-GENERATOR should take one argument,
+a list that will contain the current row
+and column number.
+The returned table will have hlines.
+
+\(fn VAL-GENERATOR ROWS COLUMNS)"
+  (funcall (-compose
+	    (-juxt #'generate--basic-tbl #'identity)
+	    #'generate--interpose-hlines
+	    #'generate--org-table-cell-values-helper)
+	   val-generator rows columns))
 
 (defconst generate-ORG-TABLE-GENS
-  (list #'generate--org-table-without-hlines #'generate--org-table-with-hlines))
+  (list #'generate-org-table-without-hlines-mv #'generate-org-table-with-hlines-mv))
 
-(defalias 'generate--org-table (apply-partially #'generate-apply-random-function-to-rest-args generate-ORG-TABLE-GENS) "Use ROWS, COLUMNS and VAL-GENERATOR to create an org-table.
+(generate--defalias-mv! generate-org-table-mv (apply-partially #'generate-apply-random-function-to-rest-args generate-ORG-TABLE-GENS)
+  "Use ROWS, COLUMNS and VAL-GENERATOR to create an org-table.
 ROWS and COLUMNS should be integers. VAL-GENERATOR
 should take one argument, a list that will contain
 the current row and column number.
 This function returns a tuple where the
 first value is the table itself and
 the second value is a list of the
-values in the table. The returned table
+values in the table. The  returned table
 may or may not have hlines.
 
- \(fn VAL-GENERATOR ROWS COLUMNS)")
-
-(defalias 'generate-org-table-without-hlines (-compose #'car #'generate--org-table-without-hlines) "Use ROWS, COLUMNS and VAL-GENERATOR to create an org-table.
-ROWS and COLUMNS should be integers. VAL-GENERATOR
-should take one argument, a list that will contain
-the current row and column number.
-The returned table will not have hlines.
-
-\(fn FUNCTION VAL-GENERATOR ROWS COLUMNS)")
-
-(defalias 'generate-org-table-with-hlines (-compose #'car #'generate--org-table-with-hlines) "Use ROWS, COLUMNS and VAL-GENERATOR to create an org-table.
-ROWS and COLUMNS should be integers. VAL-GENERATOR
-should take one argument, a list that will contain
-the current row and column number.
-The returned table will have hlines.
-
-\(fn FUNCTION VAL-GENERATOR ROWS COLUMNS)")
-
-(defalias 'generate-org-table (-compose #'car #'generate--org-table) "Use ROWS, COLUMNS and VAL-GENERATOR to create an org-table.
+\(fn VAL-GENERATOR ROWS COLUMNS)
+\\
+Use ROWS, COLUMNS and VAL-GENERATOR to create an org-table.
 ROWS and COLUMNS should be integers.
 VAL-GENERATOR should take one argument,
 a list that will contain the current row and column
 number.  The returned table may or may
 not have hlines.
 
-\(fn FUNCTION VAL-GENERATOR ROWS COLUMNS)")
+\(fn VAL-GENERATOR ROWS COLUMNS)
+")
+
+(generate--defun-mv! generate-random-org-table-mv ()
+  "This function
+returns a tuple where the first value
+is the table itself, the second
+value is a list of the values
+in the table, the third value is
+the row count of the table and the
+final value is the column count of
+the table.  The returned table
+may or may not have hlines.
+
+(\fn)
+\\
+Returns a random org table.
+The returned table may or
+may not have hlines.
+
+(\fn)"
+  (-let* ((rows (generate-random-nat-number-in-range (list 2 10)))
+	  (columns (generate-random-nat-number-in-range (list 2 10)))
+	  (test-cell-values (generate-list-of-n-words columns))
+	  (val-generator (-lambda ((x y)) (generate-nth-mod (+ x y)
+							    test-cell-values)))
+	  ((table table-values) (generate-org-table-mv val-generator
+						       rows
+						       columns)))
+    (list table table-values rows columns)))
 
 (defun generate--with-buffer-with-org-table-helper (gen gen-args body)
   "Use GEN and GEN-ARGS to create an org-table.
 Then, execute BODY in buffer with the org-table."
   (cl-with-gensyms (org-table)
     `(let ((,org-table (apply #',gen ,gen-args)))
-       (with-temp-buffer
-	 (org-mode)
-	 (insert ,org-table)
-	 (goto-char (org-table-begin))
-	 (font-lock-ensure (point-min) (point-max))
+       (generate-with-buffer-with-text ,org-table
 	 ,@body))))
 
-(cl-defmacro generate-with-buffer-with-org-table-without-hlines (org-table-args &rest body)
-  "Use ORG-TABLE-ARGS and use them to create a buffer with a table.
+(defmacro generate-with-buffer-with-org-table-without-hlines (org-table-args &rest body)
+  "Create a buffer with a table.
 The table will not have hlines.
 BODY will be executed in the buffer
 with the point at the beginning
 of the table."
   (declare (indent 1) (debug t))
-  (generate--with-buffer-with-org-table-helper #'generate-org-table-without-hlines org-table-args body))
+  (generate--with-buffer-with-org-table-helper
+   #'generate-org-table-without-hlines
+   org-table-args
+   body))
 
 (cl-defmacro generate-with-buffer-with-org-table-with-hlines (org-table-args &rest body)
   "Use ORG-TABLE-ARGS and use them to create a buffer with a table.
@@ -2083,7 +2136,10 @@ BODY will be executed in the buffer
 with the point at the beginning
 of the table."
   (declare (indent 1) (debug t))
-  (generate--with-buffer-with-org-table-helper #'generate-org-table-with-hlines org-table-args body))
+  (generate--with-buffer-with-org-table-helper
+   #'generate-org-table-with-hlines
+   org-table-args
+   body))
 
 (cl-defmacro generate-with-buffer-with-org-table (org-table-args &rest body)
   "Use ORG-TABLE-ARGS and use them to create a buffer with a table.
@@ -2092,7 +2148,22 @@ BODY will be executed in the buffer
 with the point at the beginning
 of the table."
   (declare (indent 1) (debug t))
-  (generate--with-buffer-with-org-table-helper #'generate-org-table org-table-args body))
+  (generate--with-buffer-with-org-table-helper
+   #'generate-org-table
+   org-table-args
+   body))
+
+(cl-defmacro generate-with-buffer-with-random-org-table (&rest body)
+  "Use ORG-TABLE-ARGS and use them to create a buffer with a table.
+The table may or may not have hlines.
+BODY will be executed in the buffer
+with the point at the beginning
+of the table."
+  (declare (indent 1) (debug t))
+  (cl-with-gensyms (org-table)
+    `(let ((,org-table (generate-random-org-table)))
+       (generate-with-buffer-with-text ,org-table
+	 ,@body))))
 
 (cl-defun generate--org-timestamp-string (lisp-timestamp &optional (with-time nil) (inactive nil))
   "Helper function used to created org timestamp strings.
@@ -2263,11 +2334,11 @@ note."
 
 (defalias 'generate-random-list-of-org-state-change-notes (generate-default-convert-n-gen-to-random #'generate-list-of-n-org-state-change-notes) "Returns a random list of org state change notes.")
 
-(defalias 'generate-block-of-n-org-state-change-notes (-compose (-partial #'s-join "\n") #'generate-list-of-n-org-state-change-notes) "Returns a block of text with N org state change notes.")
+(defalias 'generate-block-of-n-org-state-change-notes (-compose (apply-partially #'s-join "\n") #'generate-list-of-n-org-state-change-notes) "Returns a block of text with N org state change notes.")
 
 (defalias 'generate-random-block-of-org-state-change-notes (generate-default-convert-n-gen-to-random #'generate-block-of-n-org-state-change-notes) "Returns a random block of org state change notes.")
 
-(defalias 'generate-random-org-headline-level (-partial #'generate-random-nat-number-in-range (list 1 15))
+(defalias 'generate-random-org-headline-level (apply-partially #'generate-random-nat-number-in-range (list 1 15))
   "Returns a random org headline level.
 This is a convenience alias.
 
@@ -2311,7 +2382,7 @@ in the requested string.
 \(fn COUNT)
 \\Returns a string with COUNT org-src-block parameters.
 
-\(fn)"
+\(fn COUNT)"
   (let* ((keys (generate-seq-n-random-values
 		count
 		org-babel-common-header-args-w-values))
@@ -2522,7 +2593,7 @@ The form itself may be a passing form or a failing form.")
 (defun generate-list-of-n-passing-should-forms (n)
   "Returns a list of N passing shoulds forms."
   (let* ((vals (generate-list-of-n-random-values n))
-	 (should-count (generate--random-nat-number-between-0-and n))
+	 (should-count (generate-random-nat-number-between-0-and n))
 	 (should-not-count (- n should-count))
 	 (shoulds (generate-seq-take-infinite should-count (list (list t 'should))))
 	 (should-nots (generate-seq-take-infinite should-not-count (list (list t 'should-not))))
@@ -2658,7 +2729,7 @@ Values are hexadecimals."
    'rust
    'haskell))
 
-(defalias 'generate-random-language-symbol (-partial #'generate-seq-take-random-value-from-seq org-x--TEST-LANGS))
+(defalias 'generate-random-language-symbol (apply-partially #'generate-seq-take-random-value-from-seq org-x--TEST-LANGS))
 
 (defalias 'generate-random-language-name (-compose #'symbol-name #'generate-random-language-symbol))
 
@@ -2824,7 +2895,7 @@ called a random amount of times."
 						       gens)
   (lambda (alias-creator)
     (-let* (((alias-name alias) (funcall alias-creator type gens))
-	   (formatted-alias (generate--indent-elisp-code alias)))
+	    (formatted-alias (generate--indent-elisp-code alias)))
       (concat subheading-stars " "
 	      alias-name  "\n"
 	      src-block-start "\n"
@@ -3080,7 +3151,7 @@ The list will have N maps.
 
 \(fn)")
 
-(defalias 'generate-random-value (-partial #'generate-call-random-function generate--ALL-GENS) "Returns a random value.")
+(defalias 'generate-random-value (apply-partially #'generate-call-random-function generate--ALL-GENS) "Returns a random value.")
 
 (provide 'generate)
 ;;; generate.el ends here

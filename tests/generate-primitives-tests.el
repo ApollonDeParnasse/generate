@@ -434,7 +434,7 @@
 
 (generate-ert-deftest-n-times generate-seq-n-random-infinite-subseqs ()
   :num-runs 100
-  (-let* ((test-subseqs-count (1+ (generate--random-nat-number-in-range-10)))
+  (-let* ((test-subseqs-count (1+ (generate-random-nat-number-in-range-10)))
 	  (test-seq (generate-random-seq))
 	  (actual-subseqs (generate-seq-n-random-infinite-subseqs test-subseqs-count test-seq)))
     (should (length= actual-subseqs test-subseqs-count))))
@@ -611,7 +611,7 @@
 
 (generate-ert-deftest-n-times generate--list-of-n-sentences-base-default ()
   :num-runs 100
-  (-let* ((sentence-count (generate--random-nat-number-in-range-10))
+  (-let* ((sentence-count (generate-random-nat-number-in-range-10))
 	  ((actual-result actual-all-words) (generate--list-of-n-sentences-base sentence-count))
 	  (actual-random-value (generate-seq-take-random-value-from-seq actual-result)))
     (should (s-ends-with-p "." actual-random-value))
@@ -621,7 +621,7 @@
 (generate-ert-deftest-n-times generate--list-of-n-sentences-base-with-extra ()
   :num-runs 100
   (-let* ((test-gen (generate-seq-take-random-value TESTGENS))
-	  (sentence-count (generate--random-nat-number-in-range-10))
+	  (sentence-count (generate-random-nat-number-in-range-10))
 	  ((actual-result actual-all-words actual-list-of-regular-words actual-list-of-words-from-gens) (generate--list-of-n-sentences-base sentence-count test-gen))
 	  (actual-random-value (generate-seq-take-random-value-from-seq actual-result)))
     (should (s-ends-with-p "." actual-random-value))
@@ -637,7 +637,7 @@
 
 (generate-ert-deftest-n-times generate--string-with-n-lines-base-default ()
   :num-runs 100
-  (-let* ((line-count (generate--random-nat-number-in-range-10))
+  (-let* ((line-count (generate-random-nat-number-in-range-10))
 	  ((actual-buffer-lines actual-list-of-sentences actual-all-words) (generate--string-with-n-lines-base line-count)))
     (should (equal (s-count-matches "\n" actual-buffer-lines) (1- line-count)))
     (should (listp actual-list-of-sentences))
@@ -646,7 +646,7 @@
 (generate-ert-deftest-n-times generate--string-with-n-lines-base-with-extra ()
   :num-runs 100
   (-let* ((test-gens (generate-seq-two-random-values TESTGENS))
-	  (line-count (1+ (generate--random-nat-number-in-range-10)))
+	  (line-count (1+ (generate-random-nat-number-in-range-10)))
 	  ((actual-buffer-lines actual-list-of-sentences actual-all-words actual-regular-words actual-words-from-gens) (generate--string-with-n-lines-base line-count test-gens)))
     (should (equal (s-count-matches "\n" actual-buffer-lines) (1- line-count)))
     (should (listp actual-list-of-sentences))
@@ -853,7 +853,7 @@
 
 (generate-ert-deftest-n-times generate-list-of-n-lisp-timestamps ()
   :num-runs 100
-  (-let* ((test-count (generate--random-nat-number-in-range-10))
+  (-let* ((test-count (generate-random-nat-number-in-range-10))
 	  (actual-timestamps (generate-list-of-n-lisp-timestamps test-count))
 	  ((actual-random-ticks . actual-random-hz) (generate-seq-take-random-value-from-seq actual-timestamps)))
     (should (length= actual-timestamps test-count))
@@ -879,9 +879,9 @@
 
 (generate-ert-deftest-n-times generate--list-of-n-unzipped-starts-ends-durations ()
   :num-runs 100
-  (-let* ((test-n (generate--random-nat-number-in-range-10))
+  (-let* ((test-n (generate-random-nat-number-in-range-10))
 	  (actual-list (generate--list-of-n-unzipped-starts-ends-durations test-n))
-	  (random-n (generate--random-nat-number-between-0-and test-n))
+	  (random-n (generate-random-nat-number-between-0-and test-n))
 	  (((actual-random-start-ticks . actual-random-start-hz) (actual-random-end-ticks . actual-random-end-hz) actual-random-duration) (mapcar (apply-partially #'nth random-n) actual-list)))
     (mapc (lambda (x) (should (length= x test-n))) actual-list)
     (mapc (lambda (x) (should x)) (list actual-random-start-ticks actual-random-end-ticks actual-random-start-hz actual-random-end-hz actual-random-duration))))
@@ -996,7 +996,7 @@
 
 (generate-ert-deftest-n-times generate-list-of-n-symbols ()
   :num-runs 100
-  (let* ((test-n (generate--random-nat-number-in-range-10))
+  (let* ((test-n (generate-random-nat-number-in-range-10))
 	 (actual-symbols (generate-list-of-n-symbols test-n)))
     (should (length= actual-symbols test-n))
     (should (symbolp (generate-seq-take-random-value-from-seq actual-symbols)))))
@@ -1049,7 +1049,7 @@
 
 (generate-ert-deftest-n-times generate-list-of-n-booleans ()
   :num-runs 100
-  (let* ((test-n (generate--random-nat-number-in-range-10))
+  (let* ((test-n (generate-random-nat-number-in-range-10))
 	 (actual-booleans (generate-list-of-n-booleans test-n)))
     (should (length= actual-booleans test-n))
     (should (booleanp (generate-seq-take-random-value-from-seq actual-booleans)))))
@@ -1062,7 +1062,7 @@
 
 (generate-ert-deftest-n-times generate-list-of-n-colors ()
   :num-runs 100
-  (let* ((test-n (generate--random-nat-number-in-range-10))
+  (let* ((test-n (generate-random-nat-number-in-range-10))
 	 (actual-colors (generate-list-of-n-colors test-n))
 	 (actual-random-color (generate-seq-take-random-value-from-seq actual-colors))
 	 (should (length= actual-colors test-n))
@@ -1081,7 +1081,7 @@
 
 (generate-ert-deftest-n-times generate-list-of-n-numbers ()
   :num-runs 100
-  (-let* (((actual-list-of-numbers expected-count) (funcall (-compose (-juxt #'generate-list-of-n-numbers #'identity) #'generate--random-nat-number-in-range-10))))
+  (-let* (((actual-list-of-numbers expected-count) (funcall (-compose (-juxt #'generate-list-of-n-numbers #'identity) #'generate-random-nat-number-in-range-10))))
     (should (equal (seq-count #'numberp actual-list-of-numbers) expected-count))))
 
 (generate-ert-deftest-n-times generate-random-list-of-numbers ()
@@ -1096,7 +1096,7 @@
 
 (generate-ert-deftest-n-times generate-list-of-n-lists ()
   :num-runs 100
-  (-let* (((actual-list-of-lists expected-count) (funcall (-compose (-juxt #'generate-list-of-n-lists #'identity) #'generate--random-nat-number-in-range-10))))
+  (-let* (((actual-list-of-lists expected-count) (funcall (-compose (-juxt #'generate-list-of-n-lists #'identity) #'generate-random-nat-number-in-range-10))))
     (should (generate--seq-every-p-list actual-list-of-lists))
     (should (length= actual-list-of-lists expected-count))))
 
@@ -1112,7 +1112,7 @@
 
 (generate-ert-deftest-n-times generate-list-of-n-vectors ()
   :num-runs 100
-  (-let* (((actual-list-of-vectors expected-count) (funcall (-compose (-juxt #'generate-list-of-n-vectors #'identity) #'generate--random-nat-number-in-range-10))))
+  (-let* (((actual-list-of-vectors expected-count) (funcall (-compose (-juxt #'generate-list-of-n-vectors #'identity) #'generate-random-nat-number-in-range-10))))
     (should (generate--seq-every-p-vector actual-list-of-vectors))
     (should (length= actual-list-of-vectors expected-count))))
 
@@ -1128,7 +1128,7 @@
 
 (generate-ert-deftest-n-times generate-list-of-n-alists ()
   :num-runs 100
-  (-let* (((actual-list-of-alists expected-count) (funcall (-compose (-juxt #'generate-list-of-n-alists #'identity) #'generate--random-nat-number-in-range-10))))
+  (-let* (((actual-list-of-alists expected-count) (funcall (-compose (-juxt #'generate-list-of-n-alists #'identity) #'generate-random-nat-number-in-range-10))))
     (should (generate--seq-every-p-alist actual-list-of-alists))
     (should (length= actual-list-of-alists expected-count))))
 
@@ -1144,7 +1144,7 @@
 
 (generate-ert-deftest-n-times generate-list-of-n-plists ()
   :num-runs 100
-  (-let* (((actual-list-of-plists expected-count) (funcall (-compose (-juxt #'generate-list-of-n-plists #'identity) #'generate--random-nat-number-in-range-10))))
+  (-let* (((actual-list-of-plists expected-count) (funcall (-compose (-juxt #'generate-list-of-n-plists #'identity) #'generate-random-nat-number-in-range-10))))
     (should (generate--seq-every-p-plist actual-list-of-plists))
     (should (length= actual-list-of-plists expected-count))))
 
@@ -1160,7 +1160,7 @@
 
 (generate-ert-deftest-n-times generate-list-of-n-hash-tables ()
   :num-runs 100
-  (-let* (((actual-list-of-hash-tables expected-count) (funcall (-compose (-juxt #'generate-list-of-n-hash-tables #'identity) #'generate--random-nat-number-in-range-10))))
+  (-let* (((actual-list-of-hash-tables expected-count) (funcall (-compose (-juxt #'generate-list-of-n-hash-tables #'identity) #'generate-random-nat-number-in-range-10))))
     (should (generate--seq-every-p-hash-table actual-list-of-hash-tables))
     (should (length= actual-list-of-hash-tables expected-count))))
 
@@ -1176,7 +1176,7 @@
 
 (generate-ert-deftest-n-times generate-list-of-n-maps ()
   :num-runs 100
-  (-let* (((actual-list-of-maps expected-count) (funcall (-compose (-juxt #'generate-list-of-n-maps #'identity) #'generate--random-nat-number-in-range-10))))
+  (-let* (((actual-list-of-maps expected-count) (funcall (-compose (-juxt #'generate-list-of-n-maps #'identity) #'generate-random-nat-number-in-range-10))))
     (should (generate--seq-every-p-map actual-list-of-maps))
     (should (length= actual-list-of-maps expected-count))))
 
@@ -1192,7 +1192,7 @@
 
 (generate-ert-deftest-n-times generate-list-of-n-seqs ()
   :num-runs 100
-  (-let* (((actual-list-of-seqs expected-count) (funcall (-compose (-juxt #'generate-list-of-n-seqs #'identity) #'generate--random-nat-number-in-range-10))))
+  (-let* (((actual-list-of-seqs expected-count) (funcall (-compose (-juxt #'generate-list-of-n-seqs #'identity) #'generate-random-nat-number-in-range-10))))
     (should (generate--seq-every-p-seq actual-list-of-seqs))
     (should (length= actual-list-of-seqs expected-count))))
 

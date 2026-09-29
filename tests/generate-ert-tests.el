@@ -87,13 +87,13 @@
 
 (generate-ert-deftest-n-times generate-list-of-n-passing-should-forms ()
   :num-runs 0
-  (let* ((test-n (generate--random-nat-number-in-range-10))
+  (let* ((test-n (generate-random-nat-number-in-range-10))
 	 (actual-list-of-passing-should-forms (generate-list-of-n-passing-should-forms test-n)))
     (should (= (seq-count (-compose (-rpartial #'member (list 'should 'should-not)) #'car) actual-list-of-passing-should-forms) (length actual-list-of-passing-should-forms) test-n))))
 
 (generate-ert-deftest-n-times generate-list-of-n-should-forms-with-a-fail ()
   :num-runs 0
-  (let* ((test-n (generate--random-nat-number-in-range-10))
+  (let* ((test-n (generate-random-nat-number-in-range-10))
 	 (actual-list-of-should-forms (generate-list-of-n-should-forms-with-a-fail test-n)))
     (should (= (seq-count (-compose (-rpartial #'member (list 'should 'should-not)) #'car) actual-list-of-should-forms) (length actual-list-of-should-forms) test-n))))
 
