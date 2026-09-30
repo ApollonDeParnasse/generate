@@ -17,7 +17,7 @@
 **/*.org
 
 
-/.eldev
+
 
 !README.org
 
