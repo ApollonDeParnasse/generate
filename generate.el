@@ -2014,8 +2014,7 @@ in the table.  The returned table
 will not have hlines.
 
 \(fn VAL-GENERATOR ROWS COLUMNS)
-\\
-Use ROWS, COLUMNS and VAL-GENERATOR to create an org-table.
+\\Use ROWS, COLUMNS and VAL-GENERATOR to create an org-table.
 Rows and columns should be integers.
 VAL-GENERATOR should take one argument,
 a list that will contain the current
@@ -2040,8 +2039,7 @@ is a list of the values in the table.
 The returned table will have hlines.
 
 \(fn VAL-GENERATOR ROWS COLUMNS)
-\\
-Use ROWS, COLUMNS and VAL-GENERATOR to create an org-table.
+\\Use ROWS, COLUMNS and VAL-GENERATOR to create an org-table.
 ROWS and COLUMNS should be integers.
 VAL-GENERATOR should take one argument,
 a list that will contain the current row
@@ -2070,8 +2068,7 @@ values in the table. The  returned table
 may or may not have hlines.
 
 \(fn VAL-GENERATOR ROWS COLUMNS)
-\\
-Use ROWS, COLUMNS and VAL-GENERATOR to create an org-table.
+\\Use ROWS, COLUMNS and VAL-GENERATOR to create an org-table.
 ROWS and COLUMNS should be integers.
 VAL-GENERATOR should take one argument,
 a list that will contain the current row and column
@@ -2092,13 +2089,12 @@ final value is the column count of
 the table.  The returned table
 may or may not have hlines.
 
-(\fn)
-\\
-Returns a random org table.
+\(fn)
+\\Returns a random org table.
 The returned table may or
 may not have hlines.
 
-(\fn)"
+\(fn)"
   (-let* ((rows (generate-random-nat-number-in-range (list 2 10)))
 	  (columns (generate-random-nat-number-in-range (list 2 10)))
 	  (test-cell-values (generate-list-of-n-words columns))
